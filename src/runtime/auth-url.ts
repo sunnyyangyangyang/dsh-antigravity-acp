@@ -17,7 +17,7 @@ import { join } from 'node:path'
 /** 授权链接落盘文件名。 */
 export const AUTH_URL_FILE = 'login-url.txt'
 /** 只认 Google OAuth 授权端点，避免把诊断里的其它 URL 当成登录链接。 */
-const AUTH_URL_PATTERN = /https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth\?[^\s"'<>]+/g
+const AUTH_URL_PATTERN = /https:\/\/accounts\.google\.com\/o\/oauth2\/(?:v2\/)?auth\?[^\s"'<>]+/g
 
 /** 从一段 stderr 文本里取首个 Google OAuth 授权链接。 */
 export function extractAuthUrl(text: string): string | undefined {

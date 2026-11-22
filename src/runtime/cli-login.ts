@@ -47,6 +47,8 @@ export interface CliLoginOptions {
   startupTimeoutMs?: number
   /** 提交 code 后等待进程退出的上限（毫秒）。 */
   verifyTimeoutMs?: number
+  /** 临时 keyring 通道（xdg-dbus-proxy 只放行 org.freedesktop.secrets）；返回 undefined 时退回文件型存储。 */
+  keyring?: () => Promise<{ env: Record<string, string>; cleanup: () => void } | undefined>
 }
 
 interface WritableLike {
@@ -64,6 +66,7 @@ export class CliLoginManager {
   private tail = ''
   private poll: ReturnType<typeof setInterval> | undefined
   private urlWaiters: Array<(url: string | undefined) => void> = []
+  private keyringCleanup: (() => void) | undefined
 
   constructor(private readonly options: CliLoginOptions) {}
 
@@ -103,10 +106,14 @@ export class CliLoginManager {
         })
         cwd = sandbox.cwd
       }
+      // 按需起一个只放行 Secret Service 的 D-Bus 代理（沙箱内也能用系统 keyring），
+      // 登录结束/取消时由 stop() 回收。
+      const keyring = this.options.keyring ? await this.options.keyring().catch(() => undefined) : undefined
+      this.keyringCleanup = keyring?.cleanup
       this.handle = this.options.subprocess.spawn({
         argv,
         cwd,
-        env: cliEnv(process.env),
+        env: { ...cliEnv(process.env), ...(keyring?.env ?? {}) },
         stdio: { stdin: 'pipe', stdout: { maxBytes: 256 * 1024 }, stderr: { maxBytes: 256 * 1024 } },
         graceMs: 3_000,
       })
@@ -186,7 +193,13 @@ export class CliLoginManager {
 
   private consider(text: string): void {
     if (this.url) return
-    this.url = extractAuthUrl(text)
+    const url = extractAuthUrl(text)
+    if (!url) return
+    this.url = url
+    // 立刻唤醒 start() 的等待：否则 start 会一直等到超时才返回，界面看起来没反应。
+    const waiters = this.urlWaiters
+    this.urlWaiters = []
+    for (const resolve of waiters) resolve(url)
   }
 
   private waitForUrl(ms: number): Promise<string | undefined> {
@@ -209,5 +222,8 @@ export class CliLoginManager {
     const handle = this.handle
     this.handle = undefined
     try { handle?.terminate?.() } catch { /* 进程可能已退出 */ }
+    const cleanup = this.keyringCleanup
+    this.keyringCleanup = undefined
+    try { cleanup?.() } catch { /* 代理可能已退出 */ }
   }
 }

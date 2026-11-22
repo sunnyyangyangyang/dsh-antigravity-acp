@@ -44,6 +44,7 @@ import { ensureAcpCredentials } from './runtime/credentials.js'
 import { watchAuthUrl } from './runtime/auth-url.js'
 import { openAuthUrlInBrowser } from './runtime/browser-open.js'
 import { CliLoginManager } from './runtime/cli-login.js'
+import { startKeyringProxy } from './runtime/dbus-proxy.js'
 import type { AcpCredentialResult } from './runtime/credentials.js'
 import { describeLowIntegrity, isLowIntegrityTarget } from './runtime/integrity.js'
 import { describeAuthWait, redactSensitiveText } from './runtime/redact.js'
@@ -827,6 +828,9 @@ export function apply(ctx: Context, input: AntigravityPluginConfig): void {
     resolveCliPath: () => findCli(),
     openUrl: (url) => openAuthUrlInBrowser(url, { subprocess: ctx.subprocess, log: (message) => ctx.logger?.info?.(message) }),
     log: (message) => ctx.logger?.info?.(message),
+    // 登录用系统 keyring 时，只临时开一条放行 org.freedesktop.secrets 的通道；
+    // 代理不可用时 CLI 自己退回文件型 secret 存储。
+    keyring: () => startKeyringProxy({ subprocess: ctx.subprocess, home: homedir(), log: (message) => ctx.logger?.info?.(message) }),
     // 登录进程同样关进 bwrap：不 bind dbus/keyring，CLI 会退到文件型 secret 存储，
     // 于是陌生二进制即使被登录流程启动，也读不到宿主家目录或系统密钥环。
     sandbox: () => {

@@ -4,6 +4,11 @@
 
 记录源码与发布内容，不将本地构建、npm 发布和本机升级混为同一状态。日期采用 Asia/Hong_Kong。更早历史见 [Git 提交记录](https://github.com/KouzakiUmi/dsh-antigravity-acp/commits/main/)。
 
+## 0.1.59 · 2026-11-22
+
+- **修复「开始登录」无反应**：agy CLI 的 `acp --login` 输出的是 `accounts.google.com/o/oauth2/auth`（没有 `v2`），而授权链接正则只认 `/o/oauth2/v2/auth`，导致链接没被识别、浏览器不弹、面板停在原地。现在两种端点都识别；补 `CliLoginManager` 单测（抓链接立即返回、code 回填、登录态文件判定）。
+- **按需 keyring（沙箱内可用系统密钥环）**：登录开始时临时启动 `xdg-dbus-proxy --filter --talk=org.freedesktop.secrets`，socket 放 `~/.gemini/antigravity-cli`（沙箱本来就 bind 该目录），登录进程只多了这一条受限通道；结束/取消即回收。代理不可用时 CLI 自动退回文件型 secret 存储。不会再暴露整条会话总线。
+
 ## 0.1.58 · 2026-11-22
 
 - **登录进程也进 bwrap**：设置页「agy CLI 登录」不再在宿主裸跑 agy。登录进程与 ACP 共用同一套白名单（只读 `/usr` `/etc` `/sys` 与发行版符号链接；home 只暴露 `~/.gemini` 与 agy 所在目录；额外可写 `~/.config/antigravity` 与 `~/.local/share/antigravity-cli`），**不 bind dbus / system keyring**。没有 keyring 时 CLI 自动退回文件型 secret 存储（`~/.config/antigravity/plugin-secrets.json`），因此无需把系统密钥环暴露给这个二进制。
