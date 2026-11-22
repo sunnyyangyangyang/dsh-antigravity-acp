@@ -129,6 +129,8 @@ export interface SandboxCommand extends SandboxPaths {
   args?: readonly string[] | undefined
   /** 额外只读挂载的宿主路径（如 agy CLI 所在目录）；重复/在安装根内的会被跳过。 */
   extraReadOnlyBinds?: readonly string[] | undefined
+  /** 额外可写挂载（agy CLI 的 ~/.config/antigravity 与 app data）；调用方负责预建目录。 */
+  extraReadWriteBinds?: readonly string[] | undefined
   /** 宿主文件系统探针，测试注入。 */
   probe?: SandboxFsProbe | undefined
 }
@@ -168,9 +170,18 @@ export function buildSandboxArgv(command: SandboxCommand): string[] {
   // systemd-resolved 的 stub 配置是 /etc/resolv.conf 的符号链接目标；缺了它 DNS 会断。
   const resolveDir = '/run/systemd/resolve'
   if (probe.exists(resolveDir)) argv.push('--ro-bind', resolveDir, resolveDir)
-  // 额外只读挂载：agentCommand=cli 时 augy CLI 装在 home 外/安装根外，需要单独 bind。
+
+  // home 父目录给一个空的 tmpfs，再把两个可写子树 bind 上去，最后把遮蔽层
+  // remount 成只读（--remount-ro 不递归，两个 bind 仍然可写）：沙箱进程即兴往
+  // 家目录写文件只会撞 EROFS，不会在私有 tmpfs 里无限吃宿主内存。
+  const homeParent = dirname(home)
+  const maskHome = homeParent !== '/' && home !== '/' && probe.exists(homeParent)
+  if (maskHome) argv.push('--tmpfs', homeParent)
+  // 额外只读挂载（agentCommand=cli 的 agy 目录）必须在 home 遮蔽层之后：
+  // 否则挂载点会被后面的 --tmpfs 盖住，exec 时得到 ENOENT。
   const installRootNormalized = resolve(installRoot)
-  for (const candidate of new Set(command.extraReadOnlyBinds ?? [])) {
+  const extraBinds = new Set(command.extraReadOnlyBinds ?? [])
+  for (const candidate of extraBinds) {
     if (!candidate) continue
     const path = resolve(candidate)
     if (path === '/' || path === installRootNormalized) continue
@@ -178,12 +189,15 @@ export function buildSandboxArgv(command: SandboxCommand): string[] {
     if (!probe.exists(path)) continue
     argv.push('--ro-bind', path, path)
   }
-  // home 父目录给一个空的 tmpfs，再把两个可写子树 bind 上去，最后把遮蔽层
-  // remount 成只读（--remount-ro 不递归，两个 bind 仍然可写）：沙箱进程即兴往
-  // 家目录写文件只会撞 EROFS，不会在私有 tmpfs 里无限吃宿主内存。
-  const homeParent = dirname(home)
-  const maskHome = homeParent !== '/' && home !== '/' && probe.exists(homeParent)
-  if (maskHome) argv.push('--tmpfs', homeParent)
+  // 额外可写挂载（CLI 的 secret 存储与 app data）同样必须在遮蔽层之后。
+  for (const candidate of new Set(command.extraReadWriteBinds ?? [])) {
+    if (!candidate) continue
+    const path = resolve(candidate)
+    if (path === '/' || path === installRootNormalized || path === gemini) continue
+    if (path.startsWith(installRootNormalized + sep) || path.startsWith(gemini + sep)) continue
+    if (!probe.exists(path)) continue
+    argv.push('--bind', path, path)
+  }
   argv.push('--bind', gemini, gemini)
   argv.push('--bind', installRoot, installRoot)
   if (maskHome) argv.push('--remount-ro', homeParent)

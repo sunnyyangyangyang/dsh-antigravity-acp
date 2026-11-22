@@ -173,6 +173,23 @@ it('extraReadOnlyBinds 把 CLI 目录只读挂进去，跳过重复与安装根�
   expect(roBinds).not.toContain(paths.installRoot + '/1.4.0/extract-1.4.0')
 })
 
+it('extraReadWriteBinds 把 CLI 的 config 目录可写挂进去', () => {
+  const configDir = '/home/u/.config/antigravity'
+  const argv = buildSandboxArgv({
+    bwrapPath: '/usr/bin/bwrap',
+    executable: '/x/agy',
+    args: ['acp'],
+    home: '/home/u',
+    installRoot: paths.installRoot,
+    cwd: paths.installRoot + '/workspace',
+    extraReadWriteBinds: [configDir],
+    probe: probe(['/usr', '/etc', '/home', '/sys', configDir]),
+  })
+  const rwBinds: string[] = []
+  argv.forEach((value, index) => { if (value === '--bind') rwBinds.push(argv[index + 1]!) })
+  expect(rwBinds).toContain(configDir)
+})
+
 it('沙箱会话工作目录落在安装根内（真实项目目录在沙箱里不可见）', () => {
   expect(sandboxSessionCwd('/home/u/.cache/dsh-antigravity-host')).toBe('/home/u/.cache/dsh-antigravity-host/workspace')
 })

@@ -8,6 +8,7 @@
  * 最后关闭插件进程内的私有 loopback MCP 桥。
  */
 import { createReadStream, existsSync } from 'node:fs'
+import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -352,6 +353,12 @@ async function startAcpRuntime(
           )
         }
         await prepareSandboxBinds(sandboxPaths)
+        if (cliCommand) {
+          // agy CLI 把 secret 存在 ~/.config/antigravity，app data 在 ~/.local/share/antigravity-cli；
+          // home 被遮蔽后必须先建好再 bind，否则登录态写不进去。
+          await mkdir(join(homedir(), '.config', 'antigravity'), { recursive: true, mode: 0o700 })
+          await mkdir(join(homedir(), '.local', 'share', 'antigravity-cli'), { recursive: true, mode: 0o700 })
+        }
       }
       handle = launchAcpAgent(subprocess, {
         executable: resolution.executablePath,
@@ -364,7 +371,15 @@ async function startAcpRuntime(
               bwrapPath,
               ...sandboxPaths,
               // agy 装在 home 下（如 ~/.dsh/cache），沙箱里需要单独只读挂它所在目录。
-              ...(cliCommand ? { extraReadOnlyBinds: [dirname(resolution.executablePath)] } : {}),
+              ...(cliCommand
+                ? {
+                    extraReadOnlyBinds: [dirname(resolution.executablePath)],
+                    extraReadWriteBinds: [
+                      join(homedir(), '.config', 'antigravity'),
+                      join(homedir(), '.local', 'share', 'antigravity-cli'),
+                    ],
+                  }
+                : {}),
             }
           : undefined,
       })
