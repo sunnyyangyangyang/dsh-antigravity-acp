@@ -4,6 +4,11 @@
 
 记录源码与发布内容，不将本地构建、npm 发布和本机升级混为同一状态。日期采用 Asia/Hong_Kong。更早历史见 [Git 提交记录](https://github.com/KouzakiUmi/dsh-antigravity-acp/commits/main/)。
 
+## 0.1.52 · 2026-11-22
+
+- **沙箱下的会话工作目录**：官方进程在 `session/new` 时会 mkdir 传入的 cwd；严格沙箱遮蔽 home 后，真实项目目录不在沙箱内，会报 `Failed to create workspace folder "file:///…": read-only file system`。现在沙箱启用时，`session/new` 与「连接 / 登录 ACP」的探测会话统一使用 `<安装根>/workspace`（预建 0700、沙箱内可写）；DSH 工具仍在真实工作区执行，只有官方进程自己的工作区记账路径变化。
+- **验证**：真实 1.4.0 二进制 + 真 token 在宿主级沙箱里 `session/new` 成功，返回 sessionId 与模型 / 思考档位目录；对不可见路径能复现上述 mkdir 错误。
+
 ## 0.1.51 · 2026-11-22
 
 - **修复解压丢失执行位**：解压现在按 zip 记录的 Unix 模式补执行位（官方 1.4.0 包：`agy_acp_server.par` 0775、`localharness_external` 0575），缓存命中的 sibling 也会补 0755。之前 `createWriteStream` 一律写 0644，官方进程在 `session/new` 阶段 spawn `localharness_external` 会拿到 `[Errno 13] Permission denied`，于是即使 OAuth 已成功、`acp_token.json` 已落盘，连接页仍显示「连接需要检查 / ACP 连接已停止」。

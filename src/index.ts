@@ -35,7 +35,7 @@ import {
   defaultAgentArgs,
 } from './runtime/binary.js'
 import type { RuntimeDirectoryLease } from './runtime/binary.js'
-import { AGY_SANDBOX_ERROR, prepareSandboxBinds, resolveBwrapPath, sandboxRequested } from './runtime/sandbox.js'
+import { AGY_SANDBOX_ERROR, prepareSandboxBinds, resolveBwrapPath, sandboxRequested, sandboxSessionCwd } from './runtime/sandbox.js'
 import { ProxyConfigError, resolveHttpsProxy, resolveProxy } from './runtime/proxy-env.js'
 import { createLiveProxiedFetch, createProxiedFetch } from './runtime/proxied-fetch.js'
 import type { ResolvedProxy } from './runtime/proxy-env.js'
@@ -501,7 +501,10 @@ export async function connectAcpAccount(ctx: Context, config: AntigravityHostCon
     const link = await ensureAcpRuntime(ctx, config, {
       onRequestPermission: () => ({ outcome: { outcome: 'cancelled' } }),
     }, runtime, { ...deps, signal })
-    return await link.newSession({ cwd: process.cwd(), mcpServers: [] }, { signal })
+    return await link.newSession({
+      cwd: sandboxRequested(config) ? sandboxSessionCwd(resolveInstallRoot()) : process.cwd(),
+      mcpServers: [],
+    }, { signal })
   } finally {
     await disposeAcpRuntime(runtime)
   }
@@ -630,6 +633,8 @@ export function apply(ctx: Context, input: AntigravityPluginConfig): void {
       },
       promptTimeoutMs: config.promptTimeoutMs,
       parkSettleMs: config.bridgeParkSettleMs,
+      // 沙箱下会话 cwd 必须在沙箱内可见；工具仍由 DSH 在真实工作区执行。
+      cwd: sandboxRequested(config) ? sandboxSessionCwd(resolveInstallRoot()) : undefined,
       modelOverrides: config.modelOverrides,
       readSettings: () => ({ ...config, sessionStore: config.resumeSessions ? sessionStore : undefined }),
       // ACP 会话复用：同一条 DSH 对话的后续回合只发增量；重启恢复默认关闭。

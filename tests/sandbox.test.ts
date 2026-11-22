@@ -11,6 +11,7 @@ import {
   buildSandboxArgv,
   resolveBwrapPath,
   sandboxRequested,
+  sandboxSessionCwd,
 } from '../src/runtime/sandbox.js'
 import type { SandboxFsProbe } from '../src/runtime/sandbox.js'
 
@@ -151,6 +152,10 @@ describe('resolveBwrapPath', () => {
     expect(resolveBwrapPath({ PATH: '' }, (p) => p === '/usr/bin/bwrap')).toBe('/usr/bin/bwrap')
     expect(resolveBwrapPath({ PATH: '' }, () => false)).toBeUndefined()
   })
+})
+
+it('沙箱会话工作目录落在安装根内（真实项目目录在沙箱里不可见）', () => {
+  expect(sandboxSessionCwd('/home/u/.cache/dsh-antigravity-host')).toBe('/home/u/.cache/dsh-antigravity-host/workspace')
 })
 
 it('沙箱错误码沿用 AGY_ 前缀，便于日志区分', () => {

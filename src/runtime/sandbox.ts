@@ -191,9 +191,22 @@ export function buildSandboxArgv(command: SandboxCommand): string[] {
 }
 
 /**
+ * 沙箱内的 ACP 会话工作目录。
+ *
+ * 官方进程会在 session/new 时 mkdir 这个路径；真实项目目录不在沙箱里（home 被
+ * 遮蔽），直接传宿主路径会让 session/new 报 "Failed to create workspace folder"。
+ * 工具执行本来就走 DSH 自己的执行面，沙箱内的 cwd 只是官方进程的工作区记账，
+ * 因此统一落在安装根下的 workspace/；DSH 侧仍用真实项目路径。
+ */
+export function sandboxSessionCwd(installRoot: string): string {
+  return join(resolve(installRoot), 'workspace')
+}
+
+/**
  * 建好 bind 源：~/.gemini 必须存在，否则 bwrap 直接报 source path 不存在。
- * 登录态与 acp_token.json 都落在这里，保持 0700。
+ * 登录态与 acp_token.json 都落在这里，保持 0700；会话工作目录也要预先建好。
  */
 export async function prepareSandboxBinds(paths: SandboxPaths): Promise<void> {
   await mkdir(join(paths.home, '.gemini'), { recursive: true, mode: 0o700 })
+  await mkdir(sandboxSessionCwd(paths.installRoot), { recursive: true, mode: 0o700 })
 }

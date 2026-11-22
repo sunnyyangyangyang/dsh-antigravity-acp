@@ -135,6 +135,7 @@ Linux 上 ACP 模式默认经 bwrap 启动官方进程，白名单如下：
 - home 父目录用空 tmpfs 顶掉，只 bind 回 `~/.gemini`（登录态）与可执行文件安装根（含 `TMPDIR`），随后把遮蔽层 remount 成只读（不递归，两个 bind 仍可写）。
 - `--unshare-pid`、`--unshare-ipc`、`--unshare-uts`、`--cap-drop ALL`、`--die-with-parent`；**不** unshare 网络——生成、额度与 OAuth 都要连 Google。
 - 效果：官方进程读不到 `~/.ssh`、`~/.dsh`、`~/Documents` 等 home 内容，往家目录写文件直接 EROFS；`/usr`、`/etc` 等系统目录仍只读可见。
+- 会话工作目录：官方进程在 `session/new` 时会 mkdir 传入的 cwd，真实项目目录不在沙箱里，因此沙箱启用时统一传 `<安装根>/workspace`（预建 0700）。DSH 工具仍在真实工作区执行，只有官方进程自己的记账路径变化。
 
 缺 bwrap 时启动直接报 `AGY_SANDBOX_UNAVAILABLE`，不会静默降级为无沙箱。排障时可设 `sandbox: false` 或 `AGY_ACP_NO_SANDBOX=1`；企业版「许可证选择页要拉浏览器」这类流程在沙箱内无法拉起浏览器，需要临时关闭沙箱。
 

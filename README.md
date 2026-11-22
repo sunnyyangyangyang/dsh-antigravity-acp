@@ -18,6 +18,8 @@
 
 ---
 
+> **0.1.52 · 沙箱会话工作目录**：官方进程会在 `session/new` 时 mkdir cwd，真实项目目录不在沙箱内会失败；沙箱启用时统一用 `<安装根>/workspace`。DSH 工具仍在真实工作区执行。[查看更新记录](docs/changelog.md#0152--2026-11-22)
+
 > **0.1.51 · 修复解压丢失执行位**：官方进程在 `session/new` 里 spawn `localharness_external` 需要执行位；旧版解压统一写 0644 会导致 `[Errno 13] Permission denied`、连接页停在「连接需要检查」。现按 zip 记录补执行位，并在启动时修补旧缓存。[查看更新记录](docs/changelog.md#0151--2026-11-22)
 
 > **0.1.50 · 登录授权页自动打开**：插件用宿主桌面会话环境调 `xdg-open` 自动打开 Google 授权页（官方进程仍在沙箱内，不开浏览器权限）；失败时退回 `~/.gemini/antigravity-acp/login-url.txt`；默认授权等待放宽到 10 分钟。[查看更新记录](docs/changelog.md#0150--2026-11-22)
