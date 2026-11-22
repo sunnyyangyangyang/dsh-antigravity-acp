@@ -18,6 +18,8 @@
 
 ---
 
+> **0.1.51 · 修复解压丢失执行位**：官方进程在 `session/new` 里 spawn `localharness_external` 需要执行位；旧版解压统一写 0644 会导致 `[Errno 13] Permission denied`、连接页停在「连接需要检查」。现按 zip 记录补执行位，并在启动时修补旧缓存。[查看更新记录](docs/changelog.md#0151--2026-11-22)
+
 > **0.1.50 · 登录授权页自动打开**：插件用宿主桌面会话环境调 `xdg-open` 自动打开 Google 授权页（官方进程仍在沙箱内，不开浏览器权限）；失败时退回 `~/.gemini/antigravity-acp/login-url.txt`；默认授权等待放宽到 10 分钟。[查看更新记录](docs/changelog.md#0150--2026-11-22)
 
 > **0.1.49 · 登录授权链接落盘**：沙箱内官方进程打不开浏览器，会把 Google OAuth 授权链接打到 stderr；插件把它写到 `~/.gemini/antigravity-acp/login-url.txt`（0600），复制到浏览器即可完成登录。无 CLI 登录态时不再只能干等超时。[查看更新记录](docs/changelog.md#0149--2026-11-22)

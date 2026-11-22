@@ -4,6 +4,11 @@
 
 记录源码与发布内容，不将本地构建、npm 发布和本机升级混为同一状态。日期采用 Asia/Hong_Kong。更早历史见 [Git 提交记录](https://github.com/KouzakiUmi/dsh-antigravity-acp/commits/main/)。
 
+## 0.1.51 · 2026-11-22
+
+- **修复解压丢失执行位**：解压现在按 zip 记录的 Unix 模式补执行位（官方 1.4.0 包：`agy_acp_server.par` 0775、`localharness_external` 0575），缓存命中的 sibling 也会补 0755。之前 `createWriteStream` 一律写 0644，官方进程在 `session/new` 阶段 spawn `localharness_external` 会拿到 `[Errno 13] Permission denied`，于是即使 OAuth 已成功、`acp_token.json` 已落盘，连接页仍显示「连接需要检查 / ACP 连接已停止」。
+- **测试**：zip 构造器支持 Unix 模式；新增「解压保留执行位」与「修旧缓存 0644」用例（890 项通过）。
+
 ## 0.1.50 · 2026-11-22
 
 - **登录授权页自动打开**：插件捕获授权链接后，不再只落盘——用宿主进程的桌面会话环境（`DISPLAY` / `WAYLAND_DISPLAY` / `DBUS_SESSION_BUS_ADDRESS` / `XDG_RUNTIME_DIR` 等白名单）经 `ctx.subprocess` 调宿主 `xdg-open` 自动打开浏览器；官方进程仍留在 bwrap 沙箱里，不获得拉起浏览器的能力。打开器缺失或被拒时退回 `~/.gemini/antigravity-acp/login-url.txt` 手动打开。

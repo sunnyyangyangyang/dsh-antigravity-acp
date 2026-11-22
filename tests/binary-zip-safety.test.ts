@@ -3,7 +3,7 @@
  * 临时文件失败清理。全部使用注入的 fake fetch / 真实临时目录，无网络。
  */
 import { describe, expect, it } from 'vitest'
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -12,6 +12,7 @@ import {
   downloadBinary,
   downloadBinaryToFile,
   ensureAgentBinary,
+  ensureSiblingExecutables,
   extractZipSafely,
   MAX_EXTRACT_BYTES,
   MAX_EXTRACT_ENTRY_BYTES,
@@ -28,6 +29,38 @@ function fakeFetch(status: number, body: Uint8Array | string = new Uint8Array([1
     arrayBuffer: async () => (typeof body === 'string' ? new TextEncoder().encode(body).buffer : body.slice().buffer),
   })
 }
+
+it('解压保留 zip 记录的 Unix 执行位（.par / localharness_external）', async () => {
+  if (process.platform === 'win32') return
+  const dir = await mkdtemp(join(tmpdir(), 'agy-mode-'))
+  try {
+    const zipPath = await zipToFile([
+      { name: 'agy_acp_server.par', data: Buffer.from('bin'), mode: 0o775 },
+      { name: 'localharness_external', data: Buffer.from('helper'), mode: 0o575 },
+      { name: 'notes.txt', data: Buffer.from('text'), mode: 0o644 },
+    ], join(dir, 'archive.zip'))
+    const out = join(dir, 'out')
+    await extractZipSafely(zipPath, out)
+    for (const name of ['agy_acp_server.par', 'localharness_external']) {
+      expect((await stat(join(out, name))).mode & 0o111).not.toBe(0)
+    }
+    expect((await stat(join(out, 'notes.txt'))).mode & 0o111).toBe(0)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+it('ensureSiblingExecutables 修掉旧版本留下的 0644 缓存', async () => {
+  if (process.platform === 'win32') return
+  const dir = await mkdtemp(join(tmpdir(), 'agy-sibling-'))
+  try {
+    await writeFile(join(dir, 'localharness_external'), 'helper')
+    await ensureSiblingExecutables(dir, 'posix')
+    expect((await stat(join(dir, 'localharness_external'))).mode & 0o111).not.toBe(0)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
 
 it('默认解压上限覆盖官方 1.4.0 实测尺寸（单条 887.7 MiB / 总量 1013 MiB）', () => {
   // 2026-11-22 实测 Linux x86_64 包：agy_acp_server.par = 930,814,465 B，

@@ -533,6 +533,21 @@ export function mapNodePlatform(platform: NodeJS.Platform, arch: string): { plat
   return { platform: mappedPlatform, arch: mappedArch }
 }
 
+/** 官方 zip 里需要与主程序一起可执行的 POSIX sibling。 */
+export const POSIX_EXECUTABLE_NAMES = ['agy_acp_server.par', 'agy_acp_server', 'agy-acp-server', 'localharness_external'] as const
+
+/**
+ * 补 sibling 执行位：官方进程在 session/new 阶段会 spawn localharness_external，
+ * 解压时丢掉的执行位会让它拿 EACCES，表现成「Internal error: [Errno 13]」，
+ * 连接页只剩「连接需要检查」。缓存命中也补，修掉旧版本留下的 0644 缓存。
+ */
+export async function ensureSiblingExecutables(extractDir: string, flavor: ExecutableFlavor): Promise<void> {
+  if (flavor !== 'posix') return
+  for (const name of POSIX_EXECUTABLE_NAMES) {
+    await chmod(join(extractDir, name), 0o755).catch(() => undefined)
+  }
+}
+
 /** posix 解压产物补执行位。 */
 export async function ensureExecutable(file: string, flavor: ExecutableFlavor): Promise<void> {
   if (flavor === 'posix') {
@@ -655,6 +670,10 @@ export async function extractZipSafely(zipPath: string, destDir: string, limits:
           callback(null, chunk)
         },
       })
+      // 官方 zip 用 Unix 权限位标记可执行条目（.par = 0775、localharness_external
+      // = 0575）。createWriteStream 默认 0644，会把 sibling 的执行位丢掉，官方进程
+      // 在 session/new 里 spawn 它时会拿到 EACCES。这里按 zip 记录补回执行位。
+      const unixMode = (Number(entry.externalFileAttributes) >>> 16) & 0o777
       await new Promise<void>((resolveWrite, rejectWrite) => {
         zip.openReadStream(entry, (error, stream) => {
           if (error || !stream) {
@@ -666,7 +685,13 @@ export async function extractZipSafely(zipPath: string, destDir: string, limits:
             // 把预检时按「声明值」记的账改成「实际写出值」：声明偏大时不把没写出的
             // 字节算作已用，避免后续条目被虚假的累计量挤掉。夹到非负，防止异常
             // 时序下 totalBytes 漂成负数后反过来放宽上限。
-            .then(() => { totalBytes = Math.max(0, totalBytes - declared + written); resolveWrite() })
+            .then(async () => {
+              totalBytes = Math.max(0, totalBytes - declared + written)
+              if ((unixMode & 0o111) !== 0 && process.platform !== 'win32') {
+                await chmod(target, unixMode).catch(() => undefined)
+              }
+              resolveWrite()
+            })
             .catch((cause) => rejectWrite(cause instanceof AgyBinaryError
               ? cause
               : new AgyBinaryError(AGY_BINARY_ERROR.ARCHIVE_READ, `写出条目失败: ${entry.fileName}`, { cause })))
@@ -774,6 +799,7 @@ export async function ensureAgentBinary(options: AgentBinaryOptions = {}): Promi
   const cached = await findExtractedExecutable(extractDir, flavor)
   if (cached) {
     await ensureExecutable(cached, flavor)
+    await ensureSiblingExecutables(dirname(cached), flavor)
     return { executablePath: cached, source: 'cache', version, checksumVerified: false }
   }
 
@@ -805,6 +831,7 @@ export async function ensureAgentBinary(options: AgentBinaryOptions = {}): Promi
       const winner = await findExtractedExecutable(finalExtract, flavor)
       if (winner) {
         await ensureExecutable(winner, flavor)
+        await ensureSiblingExecutables(dirname(winner), flavor)
         return { executablePath: winner, source: 'cache', version, checksumVerified: false }
       }
       // 只有「目标已存在」这一类可自愈的失败才清掉旧目录重试：权限、跨设备
@@ -816,6 +843,7 @@ export async function ensureAgentBinary(options: AgentBinaryOptions = {}): Promi
     }
     const executablePath = join(finalExtract, relative)
     await ensureExecutable(executablePath, flavor)
+    await ensureSiblingExecutables(dirname(executablePath), flavor)
     return { executablePath, source: 'download', version, checksumVerified: false }
   } finally {
     // 失败/成功都要清掉暂存残渣（zip 临时文件与可能的半成品）。

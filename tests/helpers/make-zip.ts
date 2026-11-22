@@ -29,6 +29,8 @@ function crc32(data: Uint8Array): number {
 interface ZipInput {
   name: string
   data: Buffer
+  /** Unix 权限位（如 0o775）；省略时 central directory 写 0，表示没有平台属性。 */
+  mode?: number
 }
 
 /** 构造一个 store 方法的 zip 容器 Buffer。 */
@@ -70,7 +72,7 @@ export function zip(inputs: readonly ZipInput[]): Buffer {
     central.writeUInt16LE(0, 32) // comment
     central.writeUInt16LE(0, 34) // disk start
     central.writeUInt16LE(0, 36) // internal attrs
-    central.writeUInt32LE(0, 38) // external attrs
+    central.writeUInt32LE(input.mode === undefined ? 0 : (((0o100000 | input.mode) << 16) >>> 0), 38) // external attrs: Unix mode
     central.writeUInt32LE(offset, 42) // local header offset
     centralParts.push(central, nameBytes)
 
