@@ -76,6 +76,14 @@ export function resolveBrowserOpener(options: {
   return undefined
 }
 
+/** 最近一次成功拉起浏览器的时刻；用于抑制同一授权流程被多个进程重复打开。 */
+let lastOpenedAt = 0
+
+/** 测试用：清空去重窗口。 */
+export function resetBrowserOpenDedupe(): void {
+  lastOpenedAt = 0
+}
+
 export interface BrowserOpenDeps {
   subprocess: Pick<SubprocessRuntime, 'spawn'>
   env?: NodeJS.ProcessEnv
@@ -91,6 +99,10 @@ export interface BrowserOpenDeps {
 export function openAuthUrlInBrowser(url: string, deps: BrowserOpenDeps): boolean {
   const env = deps.env ?? process.env
   const opener = resolveBrowserOpener({ platform: deps.platform, env, exists: deps.exists })
+  if (Date.now() - lastOpenedAt < 8_000) {
+    deps.log?.('antigravity-acp: 已忽略重复的授权页打开请求（8 秒内已打开过）')
+    return true
+  }
   if (!opener) {
     deps.log?.('antigravity-acp: 未找到 xdg-open / open，无法自动打开授权页；请手动打开 ~/.gemini/antigravity-acp/login-url.txt 里的链接')
     return false
@@ -107,6 +119,7 @@ export function openAuthUrlInBrowser(url: string, deps: BrowserOpenDeps): boolea
       },
       graceMs: 2_000,
     })
+    lastOpenedAt = Date.now()
     void handle.done.catch(() => undefined)
     return true
   } catch (error) {

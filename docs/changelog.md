@@ -4,6 +4,11 @@
 
 记录源码与发布内容，不将本地构建、npm 发布和本机升级混为同一状态。日期采用 Asia/Hong_Kong。更早历史见 [Git 提交记录](https://github.com/KouzakiUmi/dsh-antigravity-acp/commits/main/)。
 
+## 0.1.56 · 2026-11-22
+
+- **授权页打开去重**：8 秒内重复的打开请求只执行一次，避免多 worker / 多进程同时认证时弹两个浏览器页。
+- **已知现象**：未登录时额度刷新会并发跑 `agy -p /usage` 与 `/credits`，两条命令各自触发交互式 OAuth（各等 60 秒），看起来像「一次弹出两个登录」；先执行一次 `agy acp --login` 即可消失。
+
 ## 0.1.55 · 2026-11-22
 
 - **CLI 后端跳过插件登录态导入**：`agentCommand: "cli"` 时不再读写 `~/.gemini/antigravity-acp/acp_token.json`，直接复用 agy 自己的登录态（`~/.config/antigravity/plugin-secrets.json`，已随沙箱可写 bind）。未登录时先运行 `agy acp --login`：CLI 会打印授权链接，浏览器打开后把页面给的 code / 完整 URL 粘回终端。

@@ -1,8 +1,10 @@
 /**
  * 宿主浏览器打开授权页的纯逻辑测试：环境白名单、打开器解析、spawn 参数。
  */
-import { describe, expect, it, vi } from 'vitest'
-import { browserOpenEnv, openAuthUrlInBrowser, resolveBrowserOpener } from '../src/runtime/browser-open.js'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { browserOpenEnv, openAuthUrlInBrowser, resetBrowserOpenDedupe, resolveBrowserOpener } from '../src/runtime/browser-open.js'
+
+beforeEach(() => resetBrowserOpenDedupe())
 
 describe('browserOpenEnv', () => {
   it('只转发桌面会话白名单，丢弃空值与无关变量', () => {
