@@ -4,6 +4,11 @@
 
 记录源码与发布内容，不将本地构建、npm 发布和本机升级混为同一状态。日期采用 Asia/Hong_Kong。更早历史见 [Git 提交记录](https://github.com/KouzakiUmi/dsh-antigravity-acp/commits/main/)。
 
+## 0.1.55 · 2026-11-22
+
+- **CLI 后端跳过插件登录态导入**：`agentCommand: "cli"` 时不再读写 `~/.gemini/antigravity-acp/acp_token.json`，直接复用 agy 自己的登录态（`~/.config/antigravity/plugin-secrets.json`，已随沙箱可写 bind）。未登录时先运行 `agy acp --login`：CLI 会打印授权链接，浏览器打开后把页面给的 code / 完整 URL 粘回终端。
+- **验证**：`agy acp --login` 输出 Google 授权链接并以粘贴 code 完成登录（redirect 为 antigravity.google/oauth-callback，不依赖回环）。
+
 ## 0.1.54 · 2026-11-22
 
 - **新增 CLI 后端 `agentCommand: "cli"`**：ACP 可直接使用官方 `agy` CLI 的 `acp` 子命令（stdio JSON-RPC）。把 `binaryPath` / `AGY_ACP_BIN` 指向 `agy` 即可；插件跳过 `.par` 的 `--uid=` 默认参数、把 agy 所在目录只读 bind 进沙箱、会话 cwd 仍用 `<安装根>/workspace`。登录与额度可共用同一套 CLI 登录态：ACP 侧导入 `~/.gemini/antigravity-cli/antigravity-oauth-token`，额度侧设 `cliQuotaEnabled` + `agyCliPath`。

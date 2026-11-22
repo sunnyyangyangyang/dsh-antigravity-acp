@@ -316,8 +316,20 @@ async function startAcpRuntime(
     // 认证，因此可以跳过 authenticate —— 该请求在没有交互式浏览器时会一直挂着。
     // 传入 acpVersion：OAuth client 元数据要从对应版本的缓存二进制里提取。
     active.lifecycle?.startupPhase('credentials')
-    const credentials = await (deps.ensureCredentials
-      ?? (() => ensureAcpCredentials({ acpVersion: config.acpVersion, cliPath: config.agyCliPath, fetchImpl: pluginFetch })))()
+    const credentials: AcpCredentialResult = cliCommand
+      ? {
+          // CLI 后端自带登录态（~/.config/antigravity/plugin-secrets.json），
+          // 不走插件的 acp_token.json 导入；未登录时先运行 agy acp --login。
+          ready: true,
+          status: 'existing',
+          authType: 'oauth-personal',
+          tokenPath: join(homedir(), '.config', 'antigravity', 'plugin-secrets.json'),
+          settingsPath: join(homedir(), '.gemini', 'antigravity-acp', 'settings.json'),
+          settingsWritten: false,
+          note: 'CLI 后端自带登录态；未登录时请先运行 agy acp --login',
+        }
+      : await (deps.ensureCredentials
+        ?? (() => ensureAcpCredentials({ acpVersion: config.acpVersion, cliPath: config.agyCliPath, fetchImpl: pluginFetch })))()
     startupSignal.throwIfAborted()
     if (!credentials.ready && deps.allowInteractiveAuth === false) {
       throw llmError('未找到可用的 ACP 登录态，请先使用“连接 / 登录 ACP”，然后再预热', 'AGY_AUTH_REQUIRED')
