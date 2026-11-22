@@ -287,6 +287,15 @@ async function startAcpRuntime(
       // 下载只允许 dl.google.com 且不跟随重定向：包一层只换传输，不放宽这两条。
       fetchImpl: (url, init) => pluginFetch(url, init) as Promise<Response>,
     })
+    // CLI 后端（agentCommand=cli）：argv 是 `agy acp`，登录与额度共用 CLI；
+    // 必须显式指定 agy 路径，避免误走 .par 的下载/缓存解析。
+    const cliCommand = config.agentCommand === 'cli'
+    if (cliCommand && resolution.source !== 'config' && resolution.source !== 'env') {
+      throw llmError(
+        'agentCommand=cli 需要把 binaryPath 或 AGY_ACP_BIN 指向官方 agy 可执行文件（不会自动下载 CLI）',
+        AGY_BINARY_ERROR.BINARY_MISSING,
+      )
+    }
     // Windows：映像文件若带 Low 强制完整性标签（例如装在带该标签的 DSH home 下），
     // 官方进程会被降成 LOW，受 MIC「禁止向上写」约束而写不进 ~/.gemini/antigravity-acp，
     // 表现为 session/new 永久挂起。这里只读探测一次并显式报错，不把挂死留给用户。
@@ -325,10 +334,13 @@ async function startAcpRuntime(
       startupSignal.throwIfAborted()
       // 沙箱：Linux 上默认经 bwrap 启动。缺 bwrap 时拒绝启动而不是悄悄裸跑；
       // 只有显式 sandbox: false 或 AGY_ACP_NO_SANDBOX=1 才会以完整用户权限运行。
+      const installRoot = resolveInstallRoot()
       const sandboxPaths = {
         home: homedir(),
-        installRoot: resolveInstallRoot(),
-        cwd: dirname(resolution.executablePath),
+        installRoot,
+        // CLI 后端的二进制通常在 home 下的自装目录，不能把工作目录也放那里；
+        // 会话工作区统一用安装根下的 workspace。
+        cwd: cliCommand ? sandboxSessionCwd(installRoot) : dirname(resolution.executablePath),
       }
       let bwrapPath: string | undefined
       if (sandboxRequested(config)) {
@@ -343,10 +355,18 @@ async function startAcpRuntime(
       }
       handle = launchAcpAgent(subprocess, {
         executable: resolution.executablePath,
-        extraArgs: [...defaultAgentArgs(), ...(config.extraArgs ?? [])],
+        // CLI 后端：agy acp [flags]；.par 后端：--uid= 等发行默认参数。
+        extraArgs: [...(cliCommand ? ['acp'] : defaultAgentArgs()), ...(config.extraArgs ?? [])],
         tmpDir: directory.path,
         proxy,
-        sandbox: bwrapPath ? { bwrapPath, ...sandboxPaths } : undefined,
+        sandbox: bwrapPath
+          ? {
+              bwrapPath,
+              ...sandboxPaths,
+              // agy 装在 home 下（如 ~/.dsh/cache），沙箱里需要单独只读挂它所在目录。
+              ...(cliCommand ? { extraReadOnlyBinds: [dirname(resolution.executablePath)] } : {}),
+            }
+          : undefined,
       })
     } catch (error) {
       await releaseRuntimeDirectory(directory).catch(() => undefined)

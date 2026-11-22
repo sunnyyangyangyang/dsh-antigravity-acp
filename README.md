@@ -18,6 +18,8 @@
 
 ---
 
+> **0.1.54 · 可切官方 agy CLI 后端**：新增 `agentCommand: "cli"`，直接跑 `agy acp`（官方 CLI 1.5.14 已在 bwrap 白名单内验证 initialize），登录与额度可共用一套 CLI 登录态；agy 所在目录只读挂进沙箱。[查看更新记录](docs/changelog.md#0154--2026-11-22)
+
 > **0.1.52 · 沙箱会话工作目录**：官方进程会在 `session/new` 时 mkdir cwd，真实项目目录不在沙箱内会失败；沙箱启用时统一用 `<安装根>/workspace`。DSH 工具仍在真实工作区执行。[查看更新记录](docs/changelog.md#0152--2026-11-22)
 
 > **0.1.51 · 修复解压丢失执行位**：官方进程在 `session/new` 里 spawn `localharness_external` 需要执行位；旧版解压统一写 0644 会导致 `[Errno 13] Permission denied`、连接页停在「连接需要检查」。现按 zip 记录补执行位，并在启动时修补旧缓存。[查看更新记录](docs/changelog.md#0151--2026-11-22)

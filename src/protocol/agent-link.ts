@@ -740,6 +740,8 @@ export function officialAgentEnv(options: {
 /** 沙箱启动参数：bwrap 路径 + 三个宿主路径（沙箱内保持同名）。 */
 export interface SandboxLaunch extends SandboxPaths {
   bwrapPath: string
+  /** 额外只读挂载（CLI 模式下的 agy 目录）。 */
+  extraReadOnlyBinds?: readonly string[] | undefined
 }
 
 /** 经 ctx.subprocess 启动官方 ACP server（本文件不触碰 child_process）。 */

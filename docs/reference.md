@@ -175,6 +175,8 @@ HTTP 额度回退只读 CLI 登录材料，换发 access token 仅留内存，�
 
 解压上限（压缩炸弹纵深防御）：条目数 2000、单条目 2 GiB、解压总量 4 GiB（0.1.47 起；旧值 512 MiB / 1 GiB 会把官方包本身拦下——2026-11-22 实测官方 1.4.0 Linux x86_64 包解压后 1,062,001,977 B，其中 `agy_acp_server.par` 单条 930,814,465 B）。
 
+`agentCommand: "cli"` 时 ACP 后端换成官方 `agy acp`（stdio JSON-RPC，1.5.x 实测 initialize 与 1.4.0 `.par` 同构）；插件只把 agy 所在目录只读挂进沙箱，登录态与额度可复用同一 CLI 账号。
+
 Linux 上的 ACP 进程默认经 bwrap 沙箱启动（配置与白名单见 [沙箱](configuration.md#沙箱linux--bwrap)）：home 只暴露 `~/.gemini` 与安装根，`/usr`、`/etc`、`/sys` 只读（`/sys` 是 tcmalloc 数 CPU 的硬依赖），`/tmp` 私有，PID/IPC/UTS 隔离；网络保留。缺 bwrap 时拒绝启动并报 `AGY_SANDBOX_UNAVAILABLE`。
 
 二进制默认**不放在 DSH home**：

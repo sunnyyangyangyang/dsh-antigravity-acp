@@ -154,6 +154,25 @@ describe('resolveBwrapPath', () => {
   })
 })
 
+it('extraReadOnlyBinds 把 CLI 目录只读挂进去，跳过重复与安装根内路径', () => {
+  const cliDir = '/home/u/.dsh/cache/antigravity-cli/1.5.14'
+  const argv = buildSandboxArgv({
+    bwrapPath: '/usr/bin/bwrap',
+    executable: cliDir + '/agy',
+    args: ['acp'],
+    home: '/home/u',
+    installRoot: paths.installRoot,
+    cwd: paths.installRoot + '/workspace',
+    extraReadOnlyBinds: [cliDir, cliDir, paths.installRoot + '/1.4.0/extract-1.4.0'],
+    probe: probe(['/usr', '/etc', '/home', '/sys', cliDir]),
+  })
+  const roBinds: string[] = []
+  argv.forEach((value, index) => { if (value === '--ro-bind') roBinds.push(argv[index + 1]!) })
+  expect(roBinds).toContain(cliDir)
+  expect(roBinds.filter((path) => path === cliDir)).toHaveLength(1)
+  expect(roBinds).not.toContain(paths.installRoot + '/1.4.0/extract-1.4.0')
+})
+
 it('沙箱会话工作目录落在安装根内（真实项目目录在沙箱里不可见）', () => {
   expect(sandboxSessionCwd('/home/u/.cache/dsh-antigravity-host')).toBe('/home/u/.cache/dsh-antigravity-host/workspace')
 })

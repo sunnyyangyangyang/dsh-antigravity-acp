@@ -20,7 +20,7 @@
  */
 import { accessSync, constants as fsConstants, lstatSync, readlinkSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
-import { delimiter, dirname, join, resolve } from 'node:path'
+import { delimiter, dirname, join, resolve, sep } from 'node:path'
 
 /** 沙箱不可用的错误码（llmError 沿用 AGY_* 前缀）。 */
 export const AGY_SANDBOX_ERROR = {
@@ -127,6 +127,8 @@ export interface SandboxCommand extends SandboxPaths {
   executable: string
   /** 传给官方进程的参数（--uid= 等），原样放在 -- 之后。 */
   args?: readonly string[] | undefined
+  /** 额外只读挂载的宿主路径（如 agy CLI 所在目录）；重复/在安装根内的会被跳过。 */
+  extraReadOnlyBinds?: readonly string[] | undefined
   /** 宿主文件系统探针，测试注入。 */
   probe?: SandboxFsProbe | undefined
 }
@@ -166,6 +168,16 @@ export function buildSandboxArgv(command: SandboxCommand): string[] {
   // systemd-resolved 的 stub 配置是 /etc/resolv.conf 的符号链接目标；缺了它 DNS 会断。
   const resolveDir = '/run/systemd/resolve'
   if (probe.exists(resolveDir)) argv.push('--ro-bind', resolveDir, resolveDir)
+  // 额外只读挂载：agentCommand=cli 时 augy CLI 装在 home 外/安装根外，需要单独 bind。
+  const installRootNormalized = resolve(installRoot)
+  for (const candidate of new Set(command.extraReadOnlyBinds ?? [])) {
+    if (!candidate) continue
+    const path = resolve(candidate)
+    if (path === '/' || path === installRootNormalized) continue
+    if (path.startsWith(installRootNormalized + sep)) continue
+    if (!probe.exists(path)) continue
+    argv.push('--ro-bind', path, path)
+  }
   // home 父目录给一个空的 tmpfs，再把两个可写子树 bind 上去，最后把遮蔽层
   // remount 成只读（--remount-ro 不递归，两个 bind 仍然可写）：沙箱进程即兴往
   // 家目录写文件只会撞 EROFS，不会在私有 tmpfs 里无限吃宿主内存。

@@ -41,6 +41,11 @@ export interface AntigravityHostConfig {
   sandbox?: boolean
   /** bwrap 可执行文件路径；留空依次查 AGY_ACP_BWRAP、PATH 与常见安装位置。 */
   bwrapPath?: string
+  /**
+   * ACP 后端：par（默认，官方 agy_acp_server.par）或 cli（官方 agy CLI 的
+   * `acp` 子命令，需把 binaryPath / AGY_ACP_BIN 指向 agy 可执行文件）。
+   */
+  agentCommand?: 'par' | 'cli'
   /** 自动下载的目标版本（默认 1.4.0）。 */
   acpVersion?: string
   /** 单个 ACP 请求默认超时（毫秒）。 */
@@ -147,6 +152,8 @@ export function liveHostConfig(config: AntigravityPluginConfig): AntigravityHost
 
 /** 官方思考档位；与 runtime/agy-cli.ts 的 AGY_REASONING_EFFORTS 一致。 */
 export const MODEL_EFFORTS = ['low', 'medium', 'high'] as const
+/** ACP 后端：par = 官方 agy_acp_server.par（默认）；cli = 官方 agy CLI 的 `acp` 子命令。 */
+export const AGENT_COMMANDS = ['par', 'cli'] as const
 
 /**
  * modelOverrides 的 schema。
@@ -174,6 +181,7 @@ export const Config = Schema.object({
   extraArgs: Schema.array(Schema.string()).default([]).description('传给 ACP server 的额外命令行参数'),
   sandbox: Schema.boolean().default(true).description('Linux 上用 bwrap 把官方 ACP 进程关进严格白名单（只读系统目录、仅 ~/.gemini 与安装目录可写、home 其余内容不可见）；非 Linux 忽略。仅在排障时关闭，关闭后官方进程拥有完整用户权限'),
   bwrapPath: Schema.string().description('bwrap 可执行文件路径；留空依次查 AGY_ACP_BWRAP、PATH 与 /usr/bin/bwrap 等常见位置'),
+  agentCommand: Schema.union(AGENT_COMMANDS).default('par').description('ACP 后端：par = 官方 agy_acp_server.par（默认）；cli = 官方 agy CLI 的 acp 子命令（binaryPath 需指向 agy，登录与额度共用 CLI）'),
   acpVersion: Schema.string().default(DEFAULT_ACP_SERVER_VERSION).description('自动下载的 ACP server 版本'),
   requestTimeoutMs: Schema.natural().default(30_000).description('单个 ACP 请求默认超时（毫秒）'),
   handshakeTimeoutMs: Schema.natural().min(1000).default(120_000).description('initialize 握手等待上限（毫秒）；官方进程冷启动（解压、杀软扫描）可能超过 1 分钟'),

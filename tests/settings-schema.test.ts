@@ -37,6 +37,7 @@ describe('live settings schema and runtime references', () => {
     expect(config.maxConcurrentSessions).toBe(2)
     expect(config.handshakeTimeoutMs).toBe(120000)
     expect(config.extraArgs).toEqual([])
+    expect(config.agentCommand).toBe('par')
     expect(config.modelOverrides).toEqual({})
   })
 

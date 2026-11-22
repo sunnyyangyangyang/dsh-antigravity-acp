@@ -17,6 +17,7 @@
 | `extraArgs` | `[]` | 额外启动参数；不要传入会改变协议、工具隔离或认证边界的参数并假定仍兼容。 |
 | `sandbox` | `true` | Linux 上用 bwrap 把官方 ACP 进程关进严格白名单：只读挂载系统目录，home 只暴露 `~/.gemini` 与安装根，`/tmp` 为私有 tmpfs，PID/IPC/UTS 隔离、能力全丢；网络保留（要连 Google）。非 Linux 忽略。缺 bwrap 时拒绝启动，不静默裸跑。 |
 | `bwrapPath` | 未设置 | bwrap 可执行文件路径；留空依次查 `AGY_ACP_BWRAP`、`PATH` 与 `/usr/bin/bwrap` 等常见位置。 |
+| `agentCommand` | `"par"` | ACP 后端：`par` = 官方 `agy_acp_server.par`（默认，自动下载）；`cli` = 官方 `agy` CLI 的 `acp` 子命令——需把 `binaryPath` / `AGY_ACP_BIN` 指向 agy，插件会跳过 `.par` 的 `--uid=` 并把 agy 所在目录只读 bind 进沙箱。登录与额度可共用同一 CLI 登录态。 |
 | `acpVersion` | `"1.4.0"` | 自动下载与缓存目标版本；不是 ACP wire protocol 版本。更换版本需重新验证厂商扩展与发行布局。 |
 | `requestTimeoutMs` | `30000` | 普通 ACP 请求超时（毫秒），覆盖 stdin 写入与响应等待。 |
 | `handshakeTimeoutMs` | `120000` | ACP `initialize` 握手上限（毫秒）。官方 PyInstaller 进程冷启动实测约 52 秒、热启动约 10 秒，旧默认 15 秒会使冷启动登录超时。 |
