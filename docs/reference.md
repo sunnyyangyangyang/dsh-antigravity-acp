@@ -112,7 +112,7 @@ ACP fs / terminal 与未知原生权限请求始终拒绝并记录，但不因�
 
 插件在 ACP 模式使用本机官方 ACP 的当前登录态；设置页没有保存多个 Google 账号或按会话选账号的入口。
 
-优先复用本机已有 ACP 凭据。设置页连接面板提供「agy CLI 登录」：宿主启动 `agy acp --login`、抓链接并打开浏览器、把页面上的 code 回填给进程，成功后 ACP 与额度共用 `~/.config/antigravity/plugin-secrets.json`。
+优先复用本机已有 ACP 凭据。设置页连接面板提供「agy CLI 登录」：登录进程同样在 bwrap 白名单里启动（不 bind dbus / keyring，CLI 自动退回文件型 secret 存储），插件抓链接并用宿主浏览器打开，把页面上的 code 回填给进程；成功后 ACP 与额度共用 `~/.config/antigravity/plugin-secrets.json`。
 
 没有 CLI 登录态时，`.par` 后端会走交互式 OAuth：官方进程在沙箱里无法自动打开浏览器，会把授权链接打到 stderr；插件把首个链接写到 `~/.gemini/antigravity-acp/login-url.txt`（0600），并用宿主进程的桌面会话环境调 `xdg-open` 自动打开（失败时才需要手动复制）。回调走 `127.0.0.1`，沙箱与宿主共享网络命名空间，因此能落回沙箱内的官方进程；默认等待 10 分钟（`authTimeoutMs`）。需要导入 CLI 登录态时，只读 `~/.gemini/antigravity-cli/antigravity-oauth-token`，换发后写入官方 ACP 使用的 `~/.gemini/antigravity-acp/acp_token.json`，并在 `settings.json` 缺少认证方式时合并 `auth.type = oauth-personal`。保留既有设置与用户指定的其它认证方式，不覆盖无法解析的设置文件。
 

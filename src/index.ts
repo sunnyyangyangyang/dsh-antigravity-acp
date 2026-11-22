@@ -827,6 +827,29 @@ export function apply(ctx: Context, input: AntigravityPluginConfig): void {
     resolveCliPath: () => findCli(),
     openUrl: (url) => openAuthUrlInBrowser(url, { subprocess: ctx.subprocess, log: (message) => ctx.logger?.info?.(message) }),
     log: (message) => ctx.logger?.info?.(message),
+    // 登录进程同样关进 bwrap：不 bind dbus/keyring，CLI 会退到文件型 secret 存储，
+    // 于是陌生二进制即使被登录流程启动，也读不到宿主家目录或系统密钥环。
+    sandbox: () => {
+      if (!sandboxRequested(config)) return undefined
+      const bwrapPath = resolveBwrapPath()
+      if (!bwrapPath) throw new Error('已启用沙箱但找不到 bwrap：请安装 bubblewrap 或配置 bwrapPath')
+      const cliPath = findCli()
+      if (!cliPath) return undefined
+      const homeDir = homedir()
+      const installRoot = resolveInstallRoot()
+      return {
+        bwrapPath,
+        home: homeDir,
+        installRoot,
+        cwd: sandboxSessionCwd(installRoot),
+        cliDir: dirname(cliPath),
+        writableDirs: [
+          join(homeDir, '.config', 'antigravity'),
+          join(homeDir, '.local', 'share', 'antigravity-cli'),
+          join(homeDir, '.gemini'),
+        ],
+      }
+    },
   })
   ctx.plugin(AgYQuotaService, {
     cliLogin,

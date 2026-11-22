@@ -4,6 +4,11 @@
 
 记录源码与发布内容，不将本地构建、npm 发布和本机升级混为同一状态。日期采用 Asia/Hong_Kong。更早历史见 [Git 提交记录](https://github.com/KouzakiUmi/dsh-antigravity-acp/commits/main/)。
 
+## 0.1.58 · 2026-11-22
+
+- **登录进程也进 bwrap**：设置页「agy CLI 登录」不再在宿主裸跑 agy。登录进程与 ACP 共用同一套白名单（只读 `/usr` `/etc` `/sys` 与发行版符号链接；home 只暴露 `~/.gemini` 与 agy 所在目录；额外可写 `~/.config/antigravity` 与 `~/.local/share/antigravity-cli`），**不 bind dbus / system keyring**。没有 keyring 时 CLI 自动退回文件型 secret 存储（`~/.config/antigravity/plugin-secrets.json`），因此无需把系统密钥环暴露给这个二进制。
+- **验证**：真实 CLI 1.5.14 在 bwrap 内 `agy acp --login` 成功输出授权链接（已抓取），登录态落文件；893 项测试、typecheck/build 通过。
+
 ## 0.1.57 · 2026-11-22
 
 - **设置页一键登录 agy CLI**：连接页新增「agy CLI 登录」面板。点「开始登录」后，宿主启动 `agy acp --login`、从输出里抓授权链接并用宿主浏览器打开；卡片里出现 code 输入框，提交后转发给该进程 stdin，并以 `~/.config/antigravity/plugin-secrets.json` 是否出现判定成功。撤销走同一进程的 terminate。不用再开终端贴 code。

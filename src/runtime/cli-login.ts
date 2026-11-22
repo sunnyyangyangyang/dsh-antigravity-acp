@@ -6,13 +6,15 @@
  * 校验登录态文件。进程本身不经沙箱执行（只是登录，不跑 agent），完成后 ACP/额度共用同一份
  * 凭证（~/.config/antigravity/plugin-secrets.json）。
  */
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { SubprocessHandle, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { cliEnv } from './agy-cli.js'
 import { extractAuthUrl } from './auth-url.js'
 import { redactSensitiveText } from './redact.js'
+import { buildSandboxArgv } from './sandbox.js'
+import type { SandboxPaths } from './sandbox.js'
 
 export type CliLoginPhase = 'idle' | 'starting' | 'waiting-code' | 'verifying' | 'signed-in' | 'failed' | 'cancelled'
 
@@ -23,7 +25,18 @@ export interface CliLoginSnapshot {
   updatedAt: string
 }
 
+/** 登录进程的沙箱参数：与 ACP 同一套 bwrap 白名单，不暴露 keyring / session bus。 */
+export interface CliLoginSandbox extends SandboxPaths {
+  bwrapPath: string
+  /** agy 可执行文件所在目录（只读挂载）。 */
+  cliDir: string
+  /** 登录要写的目录（~/.config/antigravity、~/.gemini 等）。 */
+  writableDirs: readonly string[]
+}
+
 export interface CliLoginOptions {
+  /** 提供时登录进程也关进 bwrap（推荐）；缺省时直接在宿主运行。 */
+  sandbox?: () => CliLoginSandbox | undefined
   subprocess: Pick<SubprocessRuntime, 'spawn'>
   resolveCliPath: () => string | undefined
   /** 宿主侧打开浏览器；返回是否已拉起打开器。 */
@@ -70,9 +83,29 @@ export class CliLoginManager {
     this.tail = ''
     this.set('starting', '正在启动 agy acp --login…')
     try {
+      const sandbox = this.options.sandbox?.()
+      let argv: string[] = [cliPath, 'acp', '--login']
+      let cwd = dirname(cliPath)
+      if (sandbox) {
+        // 登录进程也进同一套白名单：没有 dbus / keyring，CLI 会自动退回文件型
+        // secret 存储（~/.config/antigravity/plugin-secrets.json），于是不需要把
+        // 系统 keyring 暴露给这个二进制。
+        for (const dir of sandbox.writableDirs) mkdirSync(dir, { recursive: true, mode: 0o700 })
+        argv = buildSandboxArgv({
+          bwrapPath: sandbox.bwrapPath,
+          executable: cliPath,
+          args: ['acp', '--login'],
+          home: sandbox.home,
+          installRoot: sandbox.installRoot,
+          cwd: sandbox.cwd,
+          extraReadOnlyBinds: [sandbox.cliDir],
+          extraReadWriteBinds: sandbox.writableDirs,
+        })
+        cwd = sandbox.cwd
+      }
       this.handle = this.options.subprocess.spawn({
-        argv: [cliPath, 'acp', '--login'],
-        cwd: dirname(cliPath),
+        argv,
+        cwd,
         env: cliEnv(process.env),
         stdio: { stdin: 'pipe', stdout: { maxBytes: 256 * 1024 }, stderr: { maxBytes: 256 * 1024 } },
         graceMs: 3_000,
