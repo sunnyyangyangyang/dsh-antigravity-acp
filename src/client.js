@@ -154,14 +154,17 @@ window.__ModuleLoader__.load({
       const ready = runtime?.phase === 'ready'
       const busy = runtimeBusy(runtime) || ['connecting', 'cancelling'].includes(account?.state)
       const error = account?.state === 'error' || runtime?.phase === 'error' || registered === false
+      const loggedIn = account?.state === 'connected'
       const label = t(registered === false ? 'Provider 未注册'
         : error ? '连接需要检查'
           : busy ? account?.state === 'cancelling' ? '正在取消连接' : '正在准备连接'
-            : ready ? account?.state === 'connected' ? '账户已验证' : 'ACP 已预热'
-              : account?.state === 'cancelled' || runtime?.phase === 'stopped' ? '连接已停止'
-                : account?.state === 'connected' ? '账户已验证' : '尚未验证连接')
+            : ready ? loggedIn ? '账户已验证' : 'ACP 已预热'
+              : account?.state === 'cancelled' || runtime?.phase === 'stopped' ? loggedIn ? '已登录 ACP' : '连接已停止'
+                : loggedIn ? '账户已验证' : '尚未验证连接')
       const description = account?.runtime?.phase === 'stopped'
-        ? t('ACP 连接已停止，可以重新预热。')
+        ? loggedIn
+          ? t('登录已完成；首次对话会自动预热，也可以点「预热」保持常驻。')
+          : t('ACP 连接已停止，可以重新预热。')
         : account?.runtime?.phase === 'error'
           ? t(account.runtime.error ?? account?.message ?? 'ACP 连接异常，请重试。')
           : registered === false ? t('请确认插件已启用，Host 与 Client 均已加载。')

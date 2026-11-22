@@ -4,6 +4,10 @@
 
 记录源码与发布内容，不将本地构建、npm 发布和本机升级混为同一状态。日期采用 Asia/Hong_Kong。更早历史见 [Git 提交记录](https://github.com/KouzakiUmi/dsh-antigravity-acp/commits/main/)。
 
+## 0.1.53 · 2026-11-22
+
+- **连接状态文案**：登录成功、探测会话随后被回收时，不再显示「连接已停止」，改为「已登录 ACP / 登录已完成；首次对话会自动预热，也可以点预热保持常驻」；中英字典同步。
+
 ## 0.1.52 · 2026-11-22
 
 - **沙箱下的会话工作目录**：官方进程在 `session/new` 时会 mkdir 传入的 cwd；严格沙箱遮蔽 home 后，真实项目目录不在沙箱内，会报 `Failed to create workspace folder "file:///…": read-only file system`。现在沙箱启用时，`session/new` 与「连接 / 登录 ACP」的探测会话统一使用 `<安装根>/workspace`（预建 0700、沙箱内可写）；DSH 工具仍在真实工作区执行，只有官方进程自己的工作区记账路径变化。

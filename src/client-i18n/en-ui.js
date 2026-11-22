@@ -73,6 +73,8 @@ const EN_UI = {
   '连接已停止': 'Connection stopped',
   '尚未验证连接': 'Connection not verified yet',
   'ACP 连接已停止，可以重新预热。': 'The ACP connection has stopped; you can warm it up again.',
+  '已登录 ACP': 'ACP account signed in',
+  '登录已完成；首次对话会自动预热，也可以点「预热」保持常驻。': 'Signed in. The first message warms the connection automatically; you can also warm it up to keep it ready.',
   'ACP 连接异常，请重试。': 'The ACP connection failed; please retry.',
   '请确认插件已启用，Host 与 Client 均已加载。': 'Make sure the plugin is enabled and both Host and Client are loaded.',
   '连接后可读取模型目录，不发送聊天消息。': 'Once connected, the model catalog can be read without sending any chat message.',
