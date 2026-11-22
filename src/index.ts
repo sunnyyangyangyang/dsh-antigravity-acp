@@ -43,6 +43,7 @@ import type { ResolvedProxy } from './runtime/proxy-env.js'
 import { ensureAcpCredentials } from './runtime/credentials.js'
 import { watchAuthUrl } from './runtime/auth-url.js'
 import { openAuthUrlInBrowser } from './runtime/browser-open.js'
+import { CliLoginManager } from './runtime/cli-login.js'
 import type { AcpCredentialResult } from './runtime/credentials.js'
 import { describeLowIntegrity, isLowIntegrityTarget } from './runtime/integrity.js'
 import { describeAuthWait, redactSensitiveText } from './runtime/redact.js'
@@ -821,7 +822,14 @@ export function apply(ctx: Context, input: AntigravityPluginConfig): void {
   // 仅当设置显式开启 cliQuotaEnabled 时才 spawn `agy -p /usage` 与 `/credits`
   // （AI Credits 只能这样读）。取数只读，凭据不写回、不进日志。
   registerAgYQuotaRemote(ctx)
+  const cliLogin = new CliLoginManager({
+    subprocess: ctx.subprocess,
+    resolveCliPath: () => findCli(),
+    openUrl: (url) => openAuthUrlInBrowser(url, { subprocess: ctx.subprocess, log: (message) => ctx.logger?.info?.(message) }),
+    log: (message) => ctx.logger?.info?.(message),
+  })
   ctx.plugin(AgYQuotaService, {
+    cliLogin,
     control,
     // HTTP 回退路径要从对应版本的缓存二进制里提取 OAuth client 元数据。
     deps: { cacheDir, acpVersion, cliPath: config.agyCliPath, fetchImpl: pluginFetch },

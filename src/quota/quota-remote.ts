@@ -28,6 +28,7 @@ import type { ProxyTransport } from '../proxy/transport.js'
 import { AGY_PROXY_ACCOUNT_INVOCATIONS } from '../proxy/account-remote.js'
 import { cliQuotaIdentity, markQuotaAge, quotaIdentity, QuotaSnapshotStore } from './snapshot-store.js'
 import type { QuotaMode } from './snapshot-store.js'
+import type { CliLoginManager, CliLoginSnapshot } from '../runtime/cli-login.js'
 
 export const PACKAGE_NAME = 'dsh-bundle-antigravity-host'
 /** Typert service / wire namespace。 */
@@ -89,6 +90,27 @@ function parseModels(value: unknown): unknown {
   return value
 }
 
+/** CLI 首次登录请求：status / start / submit(code) / cancel。 */
+export interface AgYCliLoginRequest { action?: 'status' | 'start' | 'submit' | 'cancel'; code?: string }
+function parseLoginRequest(value: unknown): AgYCliLoginRequest {
+  if (value === undefined || value === null) return { action: 'status' }
+  if (typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Invalid AgYCliLoginRequest')
+  const record = value as Record<string, unknown>
+  const action = record.action
+  if (action !== undefined && !['status', 'start', 'submit', 'cancel'].includes(String(action))) throw new TypeError('Invalid AgYCliLoginRequest.action')
+  const code = record.code
+  if (code !== undefined && typeof code !== 'string') throw new TypeError('Invalid AgYCliLoginRequest.code')
+  return { ...(action === undefined ? {} : { action: action as AgYCliLoginRequest['action'] }), ...(code === undefined ? {} : { code }) }
+}
+function parseLoginResult(value: unknown): CliLoginSnapshot {
+  if (!value || typeof value !== 'object') throw new TypeError('Invalid AgYCliLoginResult')
+  const record = value as Record<string, unknown>
+  if (!['idle', 'starting', 'waiting-code', 'verifying', 'signed-in', 'failed', 'cancelled'].includes(String(record.phase))) throw new TypeError('Invalid AgYCliLoginResult.phase')
+  if (typeof record.message !== 'string' || typeof record.updatedAt !== 'string') throw new TypeError('Invalid AgYCliLoginResult')
+  return value as CliLoginSnapshot
+}
+const loginRequestCodec = strictCodec(`${PACKAGE_NAME}#AgYCliLoginRequest`, parseLoginRequest)
+const loginResultCodec = strictCodec(`${PACKAGE_NAME}#AgYCliLoginResult`, parseLoginResult)
 /** 本包贡献的 invocation 描述符（直连一元调用）。 */
 export const AGY_QUOTA_INVOCATIONS: readonly InvocationDescriptor[] = [
   ...(['read', 'refresh'] as const).map((method): InvocationDescriptor => ({
@@ -110,6 +132,15 @@ export const AGY_QUOTA_INVOCATIONS: readonly InvocationDescriptor[] = [
       codec: method === 'account' ? strictCodec(`${PACKAGE_NAME}#AgYAccountRequest`, parseAccountRequest) : requestCodec }],
     result: method === 'account' ? strictCodec(`${PACKAGE_NAME}#AgYAccountResult`, parseAccount) : strictCodec(`${PACKAGE_NAME}#AgYModelsResult`, parseModels),
   })),
+  {
+    id: `${PACKAGE_NAME}#${AGY_QUOTA_SERVICE}/login`,
+    service: AGY_QUOTA_SERVICE,
+    namespace: AGY_QUOTA_SERVICE,
+    method: 'login',
+    invocation: { kind: 'direct' },
+    parameters: [{ name: 'request', wire: 'request', source: 'json', acceptsUndefined: true, codec: loginRequestCodec }],
+    result: loginResultCodec,
+  },
 ]
 
 /** 宿主 typert 注册面（对准已安装壳的 TypertContribution 形态）。 */
@@ -192,6 +223,8 @@ export interface AgYQuotaServiceOptions {
   snapshotDirectory?: string
   background?: boolean
   onScopeChange?: (tick: () => void) => () => void
+  /** agy CLI 首次登录状态机（设置页「连接 agy CLI」按钮）；缺省时 login 返回未就绪。 */
+  cliLogin?: CliLoginManager
   /** 宿主日志（index.ts 接 `ctx.logger`）；用于记录每次取数的来源与结果。 */
   log?: { info(message: string): void; warn(message: string, error?: unknown): void }
 }
@@ -216,6 +249,7 @@ export class AgYQuotaService extends TypertRemoteService {
   private readonly _modelTarget: AgYQuotaServiceOptions['modelTarget']
   private readonly _proxyQuota: AgYQuotaServiceOptions['proxyQuota']
   private readonly _log: AgYQuotaServiceOptions['log']
+  private readonly _cliLogin: CliLoginManager | undefined
   private readonly _control: SettingsControl | undefined
   private _inflight?: { key: string; result: Promise<boolean> }
 
@@ -232,6 +266,7 @@ export class AgYQuotaService extends TypertRemoteService {
     this._modelTarget = options.modelTarget
     this._proxyQuota = options.proxyQuota
     this._log = options.log
+    this._cliLogin = options.cliLogin
     this._control = options.control
     if (options.background) {
       ctx.effect(() => {
@@ -324,6 +359,19 @@ export class AgYQuotaService extends TypertRemoteService {
   private creditsUnavailable(cliOn: boolean, updatedAt: string): CreditsSnapshot {
     return { status: 'unavailable', updatedAt, error: { code: cliOn ? 'cli-unavailable' : 'cli-disabled',
       message: cliOn ? '未找到官方 agy CLI，无法查询 AI Credits' : '未开启 agy CLI 取数，不查询 AI Credits' } }
+  }
+
+  /** 设置页的一键登录：status / start / submit(code) / cancel。 */
+  async login(request?: AgYCliLoginRequest): Promise<CliLoginSnapshot> {
+    const action = request?.action ?? 'status'
+    const manager = this._cliLogin
+    if (!manager) {
+      return { phase: 'failed', message: 'CLI 登录服务未就绪（未找到 agy 路径）', updatedAt: new Date().toISOString() }
+    }
+    if (action === 'start') return manager.start()
+    if (action === 'submit') return manager.submit(request?.code ?? '')
+    if (action === 'cancel') return manager.cancel()
+    return manager.snapshot()
   }
 
   private async pull(scope: Awaited<ReturnType<AgYQuotaService['snapshotScope']>>): Promise<boolean> {

@@ -409,6 +409,54 @@ window.__ModuleLoader__.load({
         h('p', { style: { opacity: .55, fontSize: '10px', lineHeight: 1.5, margin: 0 } }, t('生成与套餐额度使用此账户 · 无需 agy CLI · ACP 已停用')))
     }
 
+    /** agy CLI 首次登录：Host 侧跑 agy acp --login，抓授权链接自动开浏览器，code 回填。 */
+    function CliLoginPanel({ control, disabled }) {
+      const [snap, setSnap] = React.useState(undefined)
+      const [code, setCode] = React.useState('')
+      const [busy, setBusy] = React.useState(false)
+      const [message, setMessage] = React.useState('')
+      const phase = snap?.phase
+      const act = async (action, payload) => {
+        if (!control || busy) return
+        setBusy(true)
+        try {
+          const value = unwrap(await control('login', { action, ...(payload ?? {}) }))
+          setSnap(value)
+          setMessage(value?.message ?? '')
+          if (value?.phase === 'signed-in') setCode('')
+        } catch (error) {
+          setMessage(error instanceof Error ? error.message : String(error))
+        } finally {
+          setBusy(false)
+        }
+      }
+      React.useEffect(() => {
+        let alive = true
+        void (async () => {
+          if (!control) return
+          try {
+            const value = unwrap(await control('login', { action: 'status' }))
+            if (alive) setSnap(value)
+          } catch { /* 未登录或服务未就绪时保持静默 */ }
+        })()
+        return () => { alive = false }
+      }, [control])
+      const signedIn = phase === 'signed-in'
+      const waiting = phase === 'waiting-code' || phase === 'verifying'
+      return h('div', { 'aria-label': t('agy CLI 登录'), style: { display: 'grid', gap: '8px', marginBottom: '12px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(128,128,128,.045)' } },
+        h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' } },
+          h('strong', { style: { fontSize: '12px' } }, t('agy CLI 登录')),
+          h('span', { role: 'status', style: { fontSize: '11px', opacity: .7 } }, t(signedIn ? '已登录' : waiting ? '等待授权码' : phase === 'verifying' ? '正在校验…' : '未登录'))),
+        h('p', { style: { margin: 0, fontSize: '11px', opacity: .65, lineHeight: 1.5 } }, t(message || snap?.message || '一次性登录：授权后 ACP 与额度共用这份登录态。')),
+        waiting ? h('div', { style: { display: 'grid', gap: '6px' } },
+          h('input', { value: code, disabled: busy || phase === 'verifying', placeholder: t('粘贴页面上的授权 code'), onChange: (event) => setCode(event.target.value), style: { padding: '6px 8px', borderRadius: '8px', border: '1px solid rgba(128,128,128,.25)', background: 'transparent', color: 'inherit', fontSize: '12px' } }),
+          h('div', { style: { display: 'flex', gap: '8px' } },
+            h('button', { type: 'button', style: ACTION, disabled: busy || !code.trim(), onClick: () => act('submit', { code }) }, t('提交授权码')),
+            h('button', { type: 'button', style: ACTION, disabled: busy, onClick: () => act('cancel') }, t('取消登录')))) : null,
+        h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' } },
+          snap?.url && !signedIn ? h('a', { href: snap.url, target: '_blank', rel: 'noreferrer', style: { fontSize: '12px' } }, t('打开授权页')) : null,
+          !signedIn && !waiting ? h('button', { type: 'button', style: ACTION, disabled: disabled || busy, onClick: () => act('start') }, t(phase === 'starting' ? '启动中…' : '开始登录')) : null))
+    }
     function AntigravitySettingsCard(props) {
       const remote = props.remote
       const [account, setAccount] = React.useState(undefined)
@@ -728,6 +776,7 @@ window.__ModuleLoader__.load({
               h(ProxyAccountPanel, { control: props.proxyControl, onAccountChanged: onProxyAccountChanged, disabled: !props.proxyControl || !view || !writable, connectDisabled: editingDisabled || connectionSettingsDirty }))
             : h('section', { style: PANEL, 'aria-label': t('账户连接') },
               h(SectionHeading, { title: t('ACP 账户与连接') }),
+              h(CliLoginPanel, { control: props.control, disabled: !props.control || !writable }),
               h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '12px' } },
                 h(StatusDot, { color: connection.color }),
                 h('div', { style: { minWidth: 0 } },
@@ -1112,14 +1161,14 @@ window.__ModuleLoader__.load({
 
     function makeControlReader(scope) {
       return async (method, request) => {
-        if (!['account', 'models'].includes(method)) throw new Error(t('不支持的设置操作'))
+        if (!['account', 'models', 'login'].includes(method)) throw new Error(t('不支持的设置操作'))
         const deadline = Date.now() + 20_000
         for (;;) {
           const service = scope.get('remote.agyQuota')
           if (typeof service?.[method] === 'function') {
             const pending = service[method](request)
             // 目录发现可能包含冷启动；各阶段超时由 Host 管理，客户端不另设更短的总期限。
-            return method === 'models' ? await pending : await withTimeout(pending, 60_000, t('设置操作超时，请重试'))
+            return method === 'models' ? await pending : await withTimeout(pending, 120_000, t('设置操作超时，请重试'))
           }
           if (Date.now() >= deadline) throw new Error(t('设置控制服务未就绪，请确认 Host 与 Client 版本一致'))
           await new Promise((resolve) => setTimeout(resolve, 500))
@@ -1191,6 +1240,19 @@ window.__ModuleLoader__.load({
       return value
     }
 
+    function parseLoginRequest(value) {
+      if (value === undefined || value === null) return { action: 'status' }
+      if (typeof value !== 'object' || Array.isArray(value)) throw new TypeError('Invalid AgYCliLoginRequest')
+      if (value.action !== undefined && !['status', 'start', 'submit', 'cancel'].includes(value.action)) throw new TypeError('Invalid AgYCliLoginRequest.action')
+      if (value.code !== undefined && typeof value.code !== 'string') throw new TypeError('Invalid AgYCliLoginRequest.code')
+      return value
+    }
+    function parseLoginResult(value) {
+      if (!value || typeof value !== 'object') throw new TypeError('Invalid AgYCliLoginResult')
+      if (!['idle', 'starting', 'waiting-code', 'verifying', 'signed-in', 'failed', 'cancelled'].includes(value.phase)) throw new TypeError('Invalid AgYCliLoginResult.phase')
+      if (typeof value.message !== 'string' || typeof value.updatedAt !== 'string') throw new TypeError('Invalid AgYCliLoginResult')
+      return value
+    }
     const AGY_QUOTA_REMOTE = {
       package: AGY_QUOTA_PACKAGE,
       descriptors: [
@@ -1228,6 +1290,15 @@ window.__ModuleLoader__.load({
             return value
           }),
         })),
+        {
+          id: `${AGY_QUOTA_PACKAGE}#${AGY_QUOTA_SERVICE}/login`,
+          service: AGY_QUOTA_SERVICE,
+          namespace: AGY_QUOTA_SERVICE,
+          method: 'login',
+          invocation: { kind: 'direct' },
+          parameters: [{ name: 'request', wire: 'request', source: 'json', acceptsUndefined: true, codec: strictCodec(`${AGY_QUOTA_PACKAGE}#AgYCliLoginRequest`, parseLoginRequest) }],
+          result: strictCodec(`${AGY_QUOTA_PACKAGE}#AgYCliLoginResult`, parseLoginResult),
+        },
       ],
     }
 

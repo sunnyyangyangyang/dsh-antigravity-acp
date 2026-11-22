@@ -4,6 +4,11 @@
 
 记录源码与发布内容，不将本地构建、npm 发布和本机升级混为同一状态。日期采用 Asia/Hong_Kong。更早历史见 [Git 提交记录](https://github.com/KouzakiUmi/dsh-antigravity-acp/commits/main/)。
 
+## 0.1.57 · 2026-11-22
+
+- **设置页一键登录 agy CLI**：连接页新增「agy CLI 登录」面板。点「开始登录」后，宿主启动 `agy acp --login`、从输出里抓授权链接并用宿主浏览器打开；卡片里出现 code 输入框，提交后转发给该进程 stdin，并以 `~/.config/antigravity/plugin-secrets.json` 是否出现判定成功。撤销走同一进程的 terminate。不用再开终端贴 code。
+- **接线**：`agyQuota` remote 新增 `login` 方法（status/start/submit/cancel），客户端 $mount 描述符同步；登录进程在宿主侧执行、不经沙箱（只做登录，不跑 agent）。
+
 ## 0.1.56 · 2026-11-22
 
 - **授权页打开去重**：8 秒内重复的打开请求只执行一次，避免多 worker / 多进程同时认证时弹两个浏览器页。
