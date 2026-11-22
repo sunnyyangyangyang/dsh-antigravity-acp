@@ -155,6 +155,9 @@ export function buildSandboxArgv(command: SandboxCommand): string[] {
     '--ro-bind', '/usr', '/usr',
   ]
   if (probe.exists('/etc')) argv.push('--ro-bind', '/etc', '/etc')
+  // tcmalloc（官方 PyInstaller 进程内嵌）启动时用 /sys/devices/system/cpu/possible 数
+  // CPU；缺 /sys 会直接 CHECK abort（NumCPUs: maybe_cpus.has_value() false）。
+  if (probe.exists('/sys')) argv.push('--ro-bind', '/sys', '/sys')
   for (const path of SYSTEM_SYMLINKS) {
     const link = probe.readlink(path)
     if (link) argv.push('--symlink', link, path)

@@ -18,6 +18,10 @@
 
 ---
 
+> **0.1.49 · 登录授权链接落盘**：沙箱内官方进程打不开浏览器，会把 Google OAuth 授权链接打到 stderr；插件把它写到 `~/.gemini/antigravity-acp/login-url.txt`（0600），复制到浏览器即可完成登录。无 CLI 登录态时不再只能干等超时。[查看更新记录](docs/changelog.md#0149--2026-11-22)
+
+> **0.1.48 · 沙箱补只读 `/sys`**：官方进程内嵌的 tcmalloc 用 `/sys/devices/system/cpu/possible` 数 CPU，0.1.47 的白名单缺 `/sys` 会 CHECK abort、ACP 链路关闭；已补 `--ro-bind /sys /sys` 并用真实 1.4.0 二进制复现验证。[查看更新记录](docs/changelog.md#0148--2026-11-22)
+
 > **0.1.47 · 严格 bwrap 沙箱与官方包解压上限修复**：Linux 上 ACP 进程默认关进 bwrap 白名单（home 只暴露 `~/.gemini`，系统目录只读，私有 /tmp，网络保留）；修掉 0.1.31 起把官方 1.4.0 包（解压后约 1.06 GB）误判成压缩炸弹的 512 MiB 上限。类型检查、**49 个文件 / 877 项测试**与构建通过。[查看更新记录](docs/changelog.md#0147--2026-11-22)
 
 > **0.1.46 · 客户端 i18n 与可靠性修复**：设置卡片、额度药丸与 Host 固定状态文本支持简体中文 / English（语言取自浏览器，缺译回落中文）；移除 `cloakSensitiveWords` 开关；修复恢复路径绕过会话表 64 项容量上限。类型检查、**48 个文件 / 864 项测试**与构建通过。[查看更新记录](docs/changelog.md#0146--2026-11-20)

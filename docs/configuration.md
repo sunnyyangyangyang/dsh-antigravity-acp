@@ -131,7 +131,7 @@ ACP 官方 agent 在同一会话内会保留上下文（2026-10-23 真机验证�
 
 Linux 上 ACP 模式默认经 bwrap 启动官方进程，白名单如下：
 
-- 只读挂载 `/usr`、`/etc`、发行版 `/bin` `/sbin` `/lib` `/lib64` 符号链接与 `/run/systemd/resolve`（DNS stub）；`/dev`、`/proc` 由 bwrap 提供；`/tmp` 是私有 tmpfs。
+- 只读挂载 `/usr`、`/etc`、`/sys`、发行版 `/bin` `/sbin` `/lib` `/lib64` 符号链接与 `/run/systemd/resolve`（DNS stub）；`/dev`、`/proc` 由 bwrap 提供；`/tmp` 是私有 tmpfs。`/sys` 是必需的：官方进程内嵌的 tcmalloc 用 `/sys/devices/system/cpu/possible` 数 CPU，缺了会 CHECK abort。
 - home 父目录用空 tmpfs 顶掉，只 bind 回 `~/.gemini`（登录态）与可执行文件安装根（含 `TMPDIR`），随后把遮蔽层 remount 成只读（不递归，两个 bind 仍可写）。
 - `--unshare-pid`、`--unshare-ipc`、`--unshare-uts`、`--cap-drop ALL`、`--die-with-parent`；**不** unshare 网络——生成、额度与 OAuth 都要连 Google。
 - 效果：官方进程读不到 `~/.ssh`、`~/.dsh`、`~/Documents` 等 home 内容，往家目录写文件直接 EROFS；`/usr`、`/etc` 等系统目录仍只读可见。

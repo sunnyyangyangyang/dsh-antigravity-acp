@@ -4,6 +4,16 @@
 
 记录源码与发布内容，不将本地构建、npm 发布和本机升级混为同一状态。日期采用 Asia/Hong_Kong。更早历史见 [Git 提交记录](https://github.com/KouzakiUmi/dsh-antigravity-acp/commits/main/)。
 
+## 0.1.49 · 2026-11-22
+
+- **登录：授权链接落盘**：官方进程在无浏览器 / 沙箱环境下无法 `webbrowser.open`，会把 Google OAuth 授权链接打到 stderr；插件现在把首个匹配的 `accounts.google.com/o/oauth2/v2/auth` 链接写到 `~/.gemini/antigravity-acp/login-url.txt`（0600，日志只记路径不记链接）。在本次 `authTimeoutMs` 内复制到浏览器打开即可完成 loopback 回调（沙箱与宿主共享网络命名空间，127.0.0.1 回调能落到沙箱内的官方进程）；没有 CLI 登录态时不再只能干等超时。
+- **测试**：新增 `extractAuthUrl` / `recordAuthUrl` / `watchAuthUrl` 用例。
+
+## 0.1.48 · 2026-11-22
+
+- **沙箱补只读 `/sys`**：官方进程内嵌的 tcmalloc 在启动时读 `/sys/devices/system/cpu/possible` 数 CPU，0.1.47 的白名单缺 `/sys`，导致 `third_party/tcmalloc/internal/sysinfo.h:76] CHECK in NumCPUs: maybe_cpus.has_value() (false)` 直接 abort、ACP 链路关闭。已加入 `--ro-bind /sys /sys`（只读内核信息，不暴露用户数据），并用真实 1.4.0 二进制在沙箱内外复现与验证。
+- **文档**：白名单列表同步 `/sys`，并写明该依赖来自 tcmalloc。
+
 ## 0.1.47 · 2026-11-22
 
 - **修复官方包被压缩炸弹上限误拦**：0.1.31 起上限按「官方包解压后 200–300MB」估算（单条 512 MiB / 总量 1 GiB），但官方 1.4.0 Linux 包实测解压后 1,062,001,977 B，其中 `agy_acp_server.par` 单条 930,814,465 B（887.7 MiB），导致 Linux 用户在下载阶段必然报 `AGY_ARCHIVE_TOO_LARGE`。上限改为单条 2 GiB / 总量 4 GiB，并补一条按官方实测尺寸断言的回归用例。

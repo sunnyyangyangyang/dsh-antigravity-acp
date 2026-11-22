@@ -112,7 +112,7 @@ ACP fs / terminal 与未知原生权限请求始终拒绝并记录，但不因�
 
 插件在 ACP 模式使用本机官方 ACP 的当前登录态；设置页没有保存多个 Google 账号或按会话选账号的入口。
 
-优先复用本机已有 ACP 凭据。需要导入时，只读 `~/.gemini/antigravity-cli/antigravity-oauth-token`，换发后写入官方 ACP 使用的 `~/.gemini/antigravity-acp/acp_token.json`，并在 `settings.json` 缺少认证方式时合并 `auth.type = oauth-personal`。保留既有设置与用户指定的其它认证方式，不覆盖无法解析的设置文件。
+优先复用本机已有 ACP 凭据。没有 CLI 登录态时会走交互式 OAuth：官方进程在沙箱里无法自动打开浏览器，会把授权链接打到 stderr；插件把首个链接写到 `~/.gemini/antigravity-acp/login-url.txt`（0600），在本次 `authTimeoutMs` 内复制到浏览器打开即可完成 127.0.0.1 回调。需要导入 CLI 登录态时，只读 `~/.gemini/antigravity-cli/antigravity-oauth-token`，换发后写入官方 ACP 使用的 `~/.gemini/antigravity-acp/acp_token.json`，并在 `settings.json` 缺少认证方式时合并 `auth.type = oauth-personal`。保留既有设置与用户指定的其它认证方式，不覆盖无法解析的设置文件。
 
 这意味着插件**可能读写本机认证材料**，不是“完全不碰凭据”。CLI 源文件不由插件改写；有可用登录态时跳过浏览器授权。没有可用登录态且本次允许交互时才退回官方 OAuth。预热与非交互目录刷新不会暗中弹登录页。CLI 登录不会由 ACP 登录反向补齐。
 
@@ -175,7 +175,7 @@ HTTP 额度回退只读 CLI 登录材料，换发 access token 仅留内存，�
 
 解压上限（压缩炸弹纵深防御）：条目数 2000、单条目 2 GiB、解压总量 4 GiB（0.1.47 起；旧值 512 MiB / 1 GiB 会把官方包本身拦下——2026-11-22 实测官方 1.4.0 Linux x86_64 包解压后 1,062,001,977 B，其中 `agy_acp_server.par` 单条 930,814,465 B）。
 
-Linux 上的 ACP 进程默认经 bwrap 沙箱启动（配置与白名单见 [沙箱](configuration.md#沙箱linux--bwrap)）：home 只暴露 `~/.gemini` 与安装根，`/usr`、`/etc` 只读，`/tmp` 私有，PID/IPC/UTS 隔离；网络保留。缺 bwrap 时拒绝启动并报 `AGY_SANDBOX_UNAVAILABLE`。
+Linux 上的 ACP 进程默认经 bwrap 沙箱启动（配置与白名单见 [沙箱](configuration.md#沙箱linux--bwrap)）：home 只暴露 `~/.gemini` 与安装根，`/usr`、`/etc`、`/sys` 只读（`/sys` 是 tcmalloc 数 CPU 的硬依赖），`/tmp` 私有，PID/IPC/UTS 隔离；网络保留。缺 bwrap 时拒绝启动并报 `AGY_SANDBOX_UNAVAILABLE`。
 
 二进制默认**不放在 DSH home**：
 

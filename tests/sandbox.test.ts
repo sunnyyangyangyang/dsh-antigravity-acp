@@ -30,7 +30,7 @@ function probe(existing: readonly string[], links: Record<string, string> = SYST
   }
 }
 
-function argvOf(existing: readonly string[] = ['/usr', '/etc', '/home', '/run/systemd/resolve']): string[] {
+function argvOf(existing: readonly string[] = ['/usr', '/etc', '/sys', '/home', '/run/systemd/resolve']): string[] {
   return buildSandboxArgv({
     bwrapPath: '/usr/bin/bwrap',
     executable: paths.cwd + '/agy_acp_server.par',
@@ -53,6 +53,9 @@ describe('buildSandboxArgv', () => {
     expect(argv).not.toContain('/')
     expect(argv.slice(argv.indexOf('--ro-bind'), argv.indexOf('--ro-bind') + 3)).toEqual(['--ro-bind', '/usr', '/usr'])
     expect(argv).toContain('/etc')
+    // tcmalloc 数 CPU 需要 /sys（只读），缺了官方进程会 CHECK abort。
+    const sysAt = argv.indexOf('/sys')
+    expect(argv.slice(sysAt - 1, sysAt + 2)).toEqual(['--ro-bind', '/sys', '/sys'])
   })
 
   it('发行版符号链接按目标重建；不是链接时退回只读 bind', () => {

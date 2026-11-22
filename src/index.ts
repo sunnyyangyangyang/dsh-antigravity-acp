@@ -40,6 +40,7 @@ import { ProxyConfigError, resolveHttpsProxy, resolveProxy } from './runtime/pro
 import { createLiveProxiedFetch, createProxiedFetch } from './runtime/proxied-fetch.js'
 import type { ResolvedProxy } from './runtime/proxy-env.js'
 import { ensureAcpCredentials } from './runtime/credentials.js'
+import { watchAuthUrl } from './runtime/auth-url.js'
 import type { AcpCredentialResult } from './runtime/credentials.js'
 import { describeLowIntegrity, isLowIntegrityTarget } from './runtime/integrity.js'
 import { describeAuthWait, redactSensitiveText } from './runtime/redact.js'
@@ -380,7 +381,16 @@ async function startAcpRuntime(
       // 而 authenticate 在没有交互式浏览器时会一直挂着（旧行为会白等 5 分钟）。
       if (!credentials.ready) {
         active.lifecycle?.startupPhase('authenticate')
-        await link.authenticate()
+        // 沙箱内官方进程打不开浏览器，会把授权链接打到 stderr；把它落到
+        // ~/.gemini/antigravity-acp/login-url.txt，用户复制即可完成 loopback 回调。
+        const stopAuthWatch = watchAuthUrl(handle.collected.stderr, {
+          log: (message) => ctx.logger?.info?.(message),
+        })
+        try {
+          await link.authenticate()
+        } finally {
+          stopAuthWatch()
+        }
       }
       startupSignal.throwIfAborted()
     } catch (error) {
