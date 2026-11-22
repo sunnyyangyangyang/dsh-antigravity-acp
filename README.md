@@ -18,6 +18,8 @@
 
 ---
 
+> **0.1.50 · 登录授权页自动打开**：插件用宿主桌面会话环境调 `xdg-open` 自动打开 Google 授权页（官方进程仍在沙箱内，不开浏览器权限）；失败时退回 `~/.gemini/antigravity-acp/login-url.txt`；默认授权等待放宽到 10 分钟。[查看更新记录](docs/changelog.md#0150--2026-11-22)
+
 > **0.1.49 · 登录授权链接落盘**：沙箱内官方进程打不开浏览器，会把 Google OAuth 授权链接打到 stderr；插件把它写到 `~/.gemini/antigravity-acp/login-url.txt`（0600），复制到浏览器即可完成登录。无 CLI 登录态时不再只能干等超时。[查看更新记录](docs/changelog.md#0149--2026-11-22)
 
 > **0.1.48 · 沙箱补只读 `/sys`**：官方进程内嵌的 tcmalloc 用 `/sys/devices/system/cpu/possible` 数 CPU，0.1.47 的白名单缺 `/sys` 会 CHECK abort、ACP 链路关闭；已补 `--ro-bind /sys /sys` 并用真实 1.4.0 二进制复现验证。[查看更新记录](docs/changelog.md#0148--2026-11-22)

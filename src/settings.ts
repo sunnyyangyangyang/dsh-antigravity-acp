@@ -177,7 +177,7 @@ export const Config = Schema.object({
   acpVersion: Schema.string().default(DEFAULT_ACP_SERVER_VERSION).description('自动下载的 ACP server 版本'),
   requestTimeoutMs: Schema.natural().default(30_000).description('单个 ACP 请求默认超时（毫秒）'),
   handshakeTimeoutMs: Schema.natural().min(1000).default(120_000).description('initialize 握手等待上限（毫秒）；官方进程冷启动（解压、杀软扫描）可能超过 1 分钟'),
-  authTimeoutMs: Schema.natural().default(300_000).description('authenticate（需人工在浏览器完成 OAuth 授权）的等待上限（毫秒）'),
+  authTimeoutMs: Schema.natural().default(600_000).description('authenticate（需人工在浏览器完成 OAuth 授权）的等待上限（毫秒）；浏览器没自动打开时，可用 ~/.gemini/antigravity-acp/login-url.txt 里的链接完成'),
   promptTimeoutMs: Schema.natural().default(1_800_000).description('单轮 session/prompt 的等待上限（毫秒）'),
   bridgeParkSettleMs: Schema.natural().default(50).description('并发 MCP tools/call 的聚合窗口（毫秒）'),
   modelOverrides: Schema.dict(ModelOverrideSchema).default({}).volatile().description('按模型 ID 的目录设置（是否显示、默认思考档位、显示名、官方模型 ID 映射）；只作用于目录中已存在的模型') as Schema<

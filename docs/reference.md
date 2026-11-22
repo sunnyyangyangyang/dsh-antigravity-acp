@@ -112,7 +112,7 @@ ACP fs / terminal 与未知原生权限请求始终拒绝并记录，但不因�
 
 插件在 ACP 模式使用本机官方 ACP 的当前登录态；设置页没有保存多个 Google 账号或按会话选账号的入口。
 
-优先复用本机已有 ACP 凭据。没有 CLI 登录态时会走交互式 OAuth：官方进程在沙箱里无法自动打开浏览器，会把授权链接打到 stderr；插件把首个链接写到 `~/.gemini/antigravity-acp/login-url.txt`（0600），在本次 `authTimeoutMs` 内复制到浏览器打开即可完成 127.0.0.1 回调。需要导入 CLI 登录态时，只读 `~/.gemini/antigravity-cli/antigravity-oauth-token`，换发后写入官方 ACP 使用的 `~/.gemini/antigravity-acp/acp_token.json`，并在 `settings.json` 缺少认证方式时合并 `auth.type = oauth-personal`。保留既有设置与用户指定的其它认证方式，不覆盖无法解析的设置文件。
+优先复用本机已有 ACP 凭据。没有 CLI 登录态时会走交互式 OAuth：官方进程在沙箱里无法自动打开浏览器，会把授权链接打到 stderr；插件把首个链接写到 `~/.gemini/antigravity-acp/login-url.txt`（0600），并用宿主进程的桌面会话环境调 `xdg-open` 自动打开（失败时才需要手动复制）。回调走 `127.0.0.1`，沙箱与宿主共享网络命名空间，因此能落回沙箱内的官方进程；默认等待 10 分钟（`authTimeoutMs`）。需要导入 CLI 登录态时，只读 `~/.gemini/antigravity-cli/antigravity-oauth-token`，换发后写入官方 ACP 使用的 `~/.gemini/antigravity-acp/acp_token.json`，并在 `settings.json` 缺少认证方式时合并 `auth.type = oauth-personal`。保留既有设置与用户指定的其它认证方式，不覆盖无法解析的设置文件。
 
 这意味着插件**可能读写本机认证材料**，不是“完全不碰凭据”。CLI 源文件不由插件改写；有可用登录态时跳过浏览器授权。没有可用登录态且本次允许交互时才退回官方 OAuth。预热与非交互目录刷新不会暗中弹登录页。CLI 登录不会由 ACP 登录反向补齐。
 

@@ -41,6 +41,7 @@ import { createLiveProxiedFetch, createProxiedFetch } from './runtime/proxied-fe
 import type { ResolvedProxy } from './runtime/proxy-env.js'
 import { ensureAcpCredentials } from './runtime/credentials.js'
 import { watchAuthUrl } from './runtime/auth-url.js'
+import { openAuthUrlInBrowser } from './runtime/browser-open.js'
 import type { AcpCredentialResult } from './runtime/credentials.js'
 import { describeLowIntegrity, isLowIntegrityTarget } from './runtime/integrity.js'
 import { describeAuthWait, redactSensitiveText } from './runtime/redact.js'
@@ -385,6 +386,12 @@ async function startAcpRuntime(
         // ~/.gemini/antigravity-acp/login-url.txt，用户复制即可完成 loopback 回调。
         const stopAuthWatch = watchAuthUrl(handle.collected.stderr, {
           log: (message) => ctx.logger?.info?.(message),
+          // 官方进程在沙箱里开不了浏览器：由宿主进程用桌面会话的环境调 xdg-open。
+          onUrl: (url) => {
+            if (openAuthUrlInBrowser(url, { subprocess, log: (message) => ctx.logger?.info?.(message) })) {
+              ctx.logger?.info?.('antigravity-acp: 已调用宿主浏览器打开授权页')
+            }
+          },
         })
         try {
           await link.authenticate()

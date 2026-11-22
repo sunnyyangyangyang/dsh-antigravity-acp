@@ -4,6 +4,12 @@
 
 记录源码与发布内容，不将本地构建、npm 发布和本机升级混为同一状态。日期采用 Asia/Hong_Kong。更早历史见 [Git 提交记录](https://github.com/KouzakiUmi/dsh-antigravity-acp/commits/main/)。
 
+## 0.1.50 · 2026-11-22
+
+- **登录授权页自动打开**：插件捕获授权链接后，不再只落盘——用宿主进程的桌面会话环境（`DISPLAY` / `WAYLAND_DISPLAY` / `DBUS_SESSION_BUS_ADDRESS` / `XDG_RUNTIME_DIR` 等白名单）经 `ctx.subprocess` 调宿主 `xdg-open` 自动打开浏览器；官方进程仍留在 bwrap 沙箱里，不获得拉起浏览器的能力。打开器缺失或被拒时退回 `~/.gemini/antigravity-acp/login-url.txt` 手动打开。
+- **默认授权等待放宽到 10 分钟**：`authTimeoutMs` 默认 `300000` → `600000`，覆盖浏览器打开 + Google 同意页的耗时；回调仍是 `127.0.0.1`，沙箱与宿主共享网络命名空间。
+- **测试**：新增 `browserOpenEnv` / `resolveBrowserOpener` / `openAuthUrlInBrowser` 用例。
+
 ## 0.1.49 · 2026-11-22
 
 - **登录：授权链接落盘**：官方进程在无浏览器 / 沙箱环境下无法 `webbrowser.open`，会把 Google OAuth 授权链接打到 stderr；插件现在把首个匹配的 `accounts.google.com/o/oauth2/v2/auth` 链接写到 `~/.gemini/antigravity-acp/login-url.txt`（0600，日志只记路径不记链接）。在本次 `authTimeoutMs` 内复制到浏览器打开即可完成 loopback 回调（沙箱与宿主共享网络命名空间，127.0.0.1 回调能落到沙箱内的官方进程）；没有 CLI 登录态时不再只能干等超时。
