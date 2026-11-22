@@ -8,6 +8,7 @@
  * 最后关闭插件进程内的私有 loopback MCP 桥。
  */
 import { createReadStream, existsSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { LlmError } from '@deepseek-ai/dsh-llm'
@@ -34,6 +35,7 @@ import {
   defaultAgentArgs,
 } from './runtime/binary.js'
 import type { RuntimeDirectoryLease } from './runtime/binary.js'
+import { AGY_SANDBOX_ERROR, prepareSandboxBinds, resolveBwrapPath, sandboxRequested } from './runtime/sandbox.js'
 import { ProxyConfigError, resolveHttpsProxy, resolveProxy } from './runtime/proxy-env.js'
 import { createLiveProxiedFetch, createProxiedFetch } from './runtime/proxied-fetch.js'
 import type { ResolvedProxy } from './runtime/proxy-env.js'
@@ -319,11 +321,30 @@ async function startAcpRuntime(
         throw llmError(describeLowIntegrity(directory.path), AGY_BINARY_ERROR.LOW_INTEGRITY)
       }
       startupSignal.throwIfAborted()
+      // 沙箱：Linux 上默认经 bwrap 启动。缺 bwrap 时拒绝启动而不是悄悄裸跑；
+      // 只有显式 sandbox: false 或 AGY_ACP_NO_SANDBOX=1 才会以完整用户权限运行。
+      const sandboxPaths = {
+        home: homedir(),
+        installRoot: resolveInstallRoot(),
+        cwd: dirname(resolution.executablePath),
+      }
+      let bwrapPath: string | undefined
+      if (sandboxRequested(config)) {
+        bwrapPath = resolveBwrapPath()
+        if (!bwrapPath) {
+          throw llmError(
+            'ACP 沙箱已启用但找不到 bwrap：请安装 bubblewrap（或配置 bwrapPath），排障时才设 sandbox: false',
+            AGY_SANDBOX_ERROR.UNAVAILABLE,
+          )
+        }
+        await prepareSandboxBinds(sandboxPaths)
+      }
       handle = launchAcpAgent(subprocess, {
         executable: resolution.executablePath,
         extraArgs: [...defaultAgentArgs(), ...(config.extraArgs ?? [])],
         tmpDir: directory.path,
         proxy,
+        sandbox: bwrapPath ? { bwrapPath, ...sandboxPaths } : undefined,
       })
     } catch (error) {
       await releaseRuntimeDirectory(directory).catch(() => undefined)

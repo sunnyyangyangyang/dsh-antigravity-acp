@@ -13,6 +13,8 @@
 import { readFileSync } from 'node:fs'
 import { dirname, delimiter } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { buildSandboxArgv } from '../runtime/sandbox.js'
+import type { SandboxPaths } from '../runtime/sandbox.js'
 import { Writable, Readable } from 'node:stream'
 import { PROTOCOL_VERSION, ndJsonStream } from '@agentclientprotocol/sdk'
 import type {
@@ -735,6 +737,11 @@ export function officialAgentEnv(options: {
   return env
 }
 
+/** 沙箱启动参数：bwrap 路径 + 三个宿主路径（沙箱内保持同名）。 */
+export interface SandboxLaunch extends SandboxPaths {
+  bwrapPath: string
+}
+
 /** 经 ctx.subprocess 启动官方 ACP server（本文件不触碰 child_process）。 */
 export function launchAcpAgent(
   subprocess: SubprocessRuntime,
@@ -745,6 +752,8 @@ export function launchAcpAgent(
     tmpDir: string
     proxy?: ProxySettings | undefined
     signal?: AbortSignal
+    /** 提供时经 bwrap 启动；由调用方保证 bwrap 可用（缺 bwrap 必须拒绝启动）。 */
+    sandbox?: SandboxLaunch | undefined
   },
 ): SubprocessHandle {
   const executable = options.executable
@@ -752,8 +761,12 @@ export function launchAcpAgent(
   // 官方 zip 带 sibling（如 localharness_external.exe）。cwd 必须是二进制目录，
   // 否则 Windows 上进程立刻退出，stdout EOF，上层只会看到「ACP 链路已关闭」。
   const cwd = options.cwd ?? binaryDir
+  const args = options.extraArgs ?? []
+  const argv = options.sandbox
+    ? buildSandboxArgv({ ...options.sandbox, executable, args })
+    : [executable, ...args]
   return subprocess.spawn({
-    argv: [executable, ...(options.extraArgs ?? [])],
+    argv,
     cwd,
     env: officialAgentEnv({ binaryDir, tmpDir: options.tmpDir, proxy: options.proxy }),
     stdio: { stdin: 'pipe', stdout: 'pipe', stderr: { maxBytes: 64 * 1024 } },

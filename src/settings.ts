@@ -33,6 +33,14 @@ export interface AntigravityHostConfig {
   autoDownload?: boolean
   /** 传给 ACP server 的额外命令行参数。 */
   extraArgs?: string[]
+  /**
+   * Linux 上用 bwrap 把官方 ACP 进程关进严格白名单：home 父目录整体遮蔽，只把
+   * ~/.gemini 与安装根 bind 回来，/tmp 用私有 tmpfs；非 Linux 忽略。
+   * 默认开启；关闭后官方进程以完整用户权限运行。
+   */
+  sandbox?: boolean
+  /** bwrap 可执行文件路径；留空依次查 AGY_ACP_BWRAP、PATH 与常见安装位置。 */
+  bwrapPath?: string
   /** 自动下载的目标版本（默认 1.4.0）。 */
   acpVersion?: string
   /** 单个 ACP 请求默认超时（毫秒）。 */
@@ -164,6 +172,8 @@ export const Config = Schema.object({
   binaryPath: Schema.string().description('官方 agy-acp-server 可执行文件路径；留空则按 AGY_ACP_BIN → 缓存 → 自动下载解析'),
   autoDownload: Schema.boolean().default(true).description('未找到本地二进制时自动从 dl.google.com 下载（仅 https + 官方域名 + 拒绝重定向）'),
   extraArgs: Schema.array(Schema.string()).default([]).description('传给 ACP server 的额外命令行参数'),
+  sandbox: Schema.boolean().default(true).description('Linux 上用 bwrap 把官方 ACP 进程关进严格白名单（只读系统目录、仅 ~/.gemini 与安装目录可写、home 其余内容不可见）；非 Linux 忽略。仅在排障时关闭，关闭后官方进程拥有完整用户权限'),
+  bwrapPath: Schema.string().description('bwrap 可执行文件路径；留空依次查 AGY_ACP_BWRAP、PATH 与 /usr/bin/bwrap 等常见位置'),
   acpVersion: Schema.string().default(DEFAULT_ACP_SERVER_VERSION).description('自动下载的 ACP server 版本'),
   requestTimeoutMs: Schema.natural().default(30_000).description('单个 ACP 请求默认超时（毫秒）'),
   handshakeTimeoutMs: Schema.natural().min(1000).default(120_000).description('initialize 握手等待上限（毫秒）；官方进程冷启动（解压、杀软扫描）可能超过 1 分钟'),

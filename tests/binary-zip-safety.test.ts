@@ -13,6 +13,8 @@ import {
   downloadBinaryToFile,
   ensureAgentBinary,
   extractZipSafely,
+  MAX_EXTRACT_BYTES,
+  MAX_EXTRACT_ENTRY_BYTES,
   pickExecutablePath,
   validateZipEntryPath,
 } from '../src/runtime/binary.js'
@@ -26,6 +28,13 @@ function fakeFetch(status: number, body: Uint8Array | string = new Uint8Array([1
     arrayBuffer: async () => (typeof body === 'string' ? new TextEncoder().encode(body).buffer : body.slice().buffer),
   })
 }
+
+it('默认解压上限覆盖官方 1.4.0 实测尺寸（单条 887.7 MiB / 总量 1013 MiB）', () => {
+  // 2026-11-22 实测 Linux x86_64 包：agy_acp_server.par = 930,814,465 B，
+  // 两个条目合计 1,062,001,977 B。旧上限 512 MiB / 1 GiB 会把官方包拦下。
+  expect(MAX_EXTRACT_ENTRY_BYTES).toBeGreaterThan(930_814_465)
+  expect(MAX_EXTRACT_BYTES).toBeGreaterThan(1_062_001_977)
+})
 
 describe('downloadBinary', () => {
   it('3xx 重定向被拒绝且不跟随（AGY_DOWNLOAD_REDIRECT_REFUSED）', async () => {

@@ -15,6 +15,8 @@
 | `binaryPath` | 未设置 | 本地官方 ACP server 入口，优先级最高；指定但不存在会报错，不静默换来源。 |
 | `autoDownload` | `true` | 无本地覆盖和有效缓存时从官方域名下载。 |
 | `extraArgs` | `[]` | 额外启动参数；不要传入会改变协议、工具隔离或认证边界的参数并假定仍兼容。 |
+| `sandbox` | `true` | Linux 上用 bwrap 把官方 ACP 进程关进严格白名单：只读挂载系统目录，home 只暴露 `~/.gemini` 与安装根，`/tmp` 为私有 tmpfs，PID/IPC/UTS 隔离、能力全丢；网络保留（要连 Google）。非 Linux 忽略。缺 bwrap 时拒绝启动，不静默裸跑。 |
+| `bwrapPath` | 未设置 | bwrap 可执行文件路径；留空依次查 `AGY_ACP_BWRAP`、`PATH` 与 `/usr/bin/bwrap` 等常见位置。 |
 | `acpVersion` | `"1.4.0"` | 自动下载与缓存目标版本；不是 ACP wire protocol 版本。更换版本需重新验证厂商扩展与发行布局。 |
 | `requestTimeoutMs` | `30000` | 普通 ACP 请求超时（毫秒），覆盖 stdin 写入与响应等待。 |
 | `handshakeTimeoutMs` | `120000` | ACP `initialize` 握手上限（毫秒）。官方 PyInstaller 进程冷启动实测约 52 秒、热启动约 10 秒，旧默认 15 秒会使冷启动登录超时。 |
@@ -106,6 +108,8 @@ ACP 官方 agent 在同一会话内会保留上下文（2026-10-23 真机验证�
 | `AGY_ACP_BIN` | 官方 ACP 可执行文件覆盖，优先级低于 `binaryPath`。 |
 | `AGY_ACP_URL` | 自动下载 URL 覆盖，仍受 HTTPS / `dl.google.com` 与不重定向约束；不赋予其它域名下载权限。 |
 | `AGY_ACP_HOME` | 官方程序与独立运行目录的用户级安装根目录覆盖；应避开 Windows Low 完整性目录。 |
+| `AGY_ACP_BWRAP` | bwrap 可执行文件覆盖，优先于 PATH 探测。 |
+| `AGY_ACP_NO_SANDBOX` | 设为 `1` / `true` 时紧急关闭 Linux 沙箱（等价 `sandbox: false`），仅供排障。 |
 | `AGY_CLI_BIN` | 官方 CLI 路径覆盖，低于显式 `agyCliPath`。 |
 | `AGY_OAUTH_CLIENT_ID` / `AGY_OAUTH_CLIENT_SECRET` | OAuth client 元数据覆盖，配对使用；不是模型 API Key，也不是用户 access / refresh token。通常不需要手动设置，不应随文档或截图分享。 |
 | `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` 与小写形式 | `proxyUrl` 未设置时的 Host 代理来源；实际选择与注入见 [`proxy-env.ts`](https://github.com/KouzakiUmi/dsh-antigravity-acp/blob/main/src/runtime/proxy-env.ts)。 |
@@ -117,11 +121,22 @@ ACP 官方 agent 在同一会话内会保留上下文（2026-10-23 真机验证�
 
 **ACP 程序：** `binaryPath` → `AGY_ACP_BIN` → 对应版本缓存 → 自动下载。手动覆盖先于自动平台映射，未知自动下载平台可使用明确指定的兼容程序。
 
-自动下载的 zip 解压受三道上限约束：条目数 2000、单条目 512MB、解压总量 1GB。官方包解压后约 200–300MB、条目数十个，正常下载不会触及；超过任一道即报 `AGY_ARCHIVE_TOO_LARGE` 并放弃本次安装，不留半成品。这是下载域名白名单之外的压缩炸弹纵深防御。
+自动下载的 zip 解压受三道上限约束：条目数 2000、单条目 2 GiB、解压总量 4 GiB（0.1.47 起；旧值 512 MiB / 1 GiB 会把官方 1.4.0 包拦下）。2026-11-22 实测官方 Linux x86_64 包：zip 336,175,910 B，解压后 1,062,001,977 B，其中 `agy_acp_server.par` 单条 930,814,465 B。超过任一道即报 `AGY_ARCHIVE_TOO_LARGE` 并放弃本次安装，不留半成品；这是下载域名白名单之外的压缩炸弹纵深防御。
 
 **CLI：** `agyCliPath` → `AGY_CLI_BIN` → PATH → 平台默认位置。显式覆盖与候选读取细节以 [`agy-cli.ts`](https://github.com/KouzakiUmi/dsh-antigravity-acp/blob/main/src/runtime/agy-cli.ts) 为准；手动刷新会重新探测，不要求插件加载时 CLI 就已安装。
 
 **代理：** 非空 `proxyUrl` 使用显式代理；留空按 Host 环境选择。清空字段不是“强制直连”，显式代理失败也不会静默直连。[代理行为与诊断](reference.md#出网代理)
+
+### 沙箱（Linux / bwrap）
+
+Linux 上 ACP 模式默认经 bwrap 启动官方进程，白名单如下：
+
+- 只读挂载 `/usr`、`/etc`、发行版 `/bin` `/sbin` `/lib` `/lib64` 符号链接与 `/run/systemd/resolve`（DNS stub）；`/dev`、`/proc` 由 bwrap 提供；`/tmp` 是私有 tmpfs。
+- home 父目录用空 tmpfs 顶掉，只 bind 回 `~/.gemini`（登录态）与可执行文件安装根（含 `TMPDIR`），随后把遮蔽层 remount 成只读（不递归，两个 bind 仍可写）。
+- `--unshare-pid`、`--unshare-ipc`、`--unshare-uts`、`--cap-drop ALL`、`--die-with-parent`；**不** unshare 网络——生成、额度与 OAuth 都要连 Google。
+- 效果：官方进程读不到 `~/.ssh`、`~/.dsh`、`~/Documents` 等 home 内容，往家目录写文件直接 EROFS；`/usr`、`/etc` 等系统目录仍只读可见。
+
+缺 bwrap 时启动直接报 `AGY_SANDBOX_UNAVAILABLE`，不会静默降级为无沙箱。排障时可设 `sandbox: false` 或 `AGY_ACP_NO_SANDBOX=1`；企业版「许可证选择页要拉浏览器」这类流程在沙箱内无法拉起浏览器，需要临时关闭沙箱。
 
 ## 设置页可以做什么
 

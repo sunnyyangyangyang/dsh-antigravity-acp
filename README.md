@@ -18,6 +18,8 @@
 
 ---
 
+> **0.1.47 · 严格 bwrap 沙箱与官方包解压上限修复**：Linux 上 ACP 进程默认关进 bwrap 白名单（home 只暴露 `~/.gemini`，系统目录只读，私有 /tmp，网络保留）；修掉 0.1.31 起把官方 1.4.0 包（解压后约 1.06 GB）误判成压缩炸弹的 512 MiB 上限。类型检查、**49 个文件 / 877 项测试**与构建通过。[查看更新记录](docs/changelog.md#0147--2026-11-22)
+
 > **0.1.46 · 客户端 i18n 与可靠性修复**：设置卡片、额度药丸与 Host 固定状态文本支持简体中文 / English（语言取自浏览器，缺译回落中文）；移除 `cloakSensitiveWords` 开关；修复恢复路径绕过会话表 64 项容量上限。类型检查、**48 个文件 / 864 项测试**与构建通过。[查看更新记录](docs/changelog.md#0146--2026-11-20)
 
 > **0.1.43 · 思考摘要、图片和上下文**：代理模式接入 Hydrogen / Neon 的思考摘要和图片输入，显示目录容量及准确的会话用量；额度改为由 Host 独立刷新、界面读取本地快照。[查看更新记录](docs/changelog.md#0143--2026-11-19)
@@ -82,6 +84,10 @@ dsh plugin --profile web add dsh-bundle-antigravity-host
 在 **宿主附件服务可用且上游声明 image capability** 时，当前消息、历史消息和工具返回的图片通过真实图片内容传入。支持 PNG、JPEG、WebP 与 GIF；只读取宿主附件，不自行抓取图片 URL。已被宿主卸载的图片会明确说明未发送像素。
 
 这是输入能力，不包含图片生成、音频或视频；真实图片识别效果尚未实机验收。[多模态限制](docs/reference.md#图片输入)
+
+### 沙箱：官方进程碰不到你的家目录
+
+Linux 上 ACP 模式默认用 bwrap 启动官方进程：只读挂载 `/usr`、`/etc` 等系统目录，home 用空 tmpfs 顶掉后只 bind 回 `~/.gemini` 与安装根，`/tmp` 是私有 tmpfs，PID/IPC/UTS 隔离、能力全丢；网络保留（生成与 OAuth 要连 Google）。实测沙箱内读不到 `~/.dsh`、`~/Documents`，往家目录写文件直接 EROFS。缺 bwrap 时拒绝启动而不是裸跑；排障可设 `sandbox: false`。[配置](docs/configuration.md#沙箱linux--bwrap)
 
 ### 额度、余额与连接状态，就在对话旁
 

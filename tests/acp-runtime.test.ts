@@ -28,7 +28,7 @@ import type { FakeAgentProcess } from './helpers/fake-subprocess.js'
 
 /** 基础配置：binaryPath 指向一个真实存在的临时文件，避免任何下载路径。 */
 function baseConfig(binaryPath: string): AntigravityHostConfig {
-  return { binaryPath, autoDownload: false, acpVersion: '1.4.0' }
+  return { binaryPath, autoDownload: false, acpVersion: '1.4.0', sandbox: false }
 }
 
 const handlers: AgentLinkHandlers = {}

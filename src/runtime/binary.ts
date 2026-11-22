@@ -28,14 +28,16 @@ export const INSTALL_DIR_NAME = 'dsh-antigravity-host'
 /**
  * 解压上限（压缩炸弹纵深防御）。
  *
- * 官方 zip 解压后约 200–300MB、条目数十个；给 4 倍余量既不误伤正常包，也挡住
- * 「几 KB 的 zip 解出几十 GB」这类攻击。下载源已限定 https + dl.google.com +
- * 拒绝重定向，因此这一层是纯纵深防御，不是唯一屏障。
+ * 2026-11-22 实测官方 1.4.0 Linux x86_64 包：zip 本体 336,175,910 B，解压后
+ * 1,062,001,977 B；其中 agy_acp_server.par 单条 930,814,465 B（约 887.7 MiB），
+ * localharness_external 131,187,512 B。旧上限（单条 512 MiB / 总量 1 GiB）会把
+ * 官方包本身拦成 AGY_ARCHIVE_TOO_LARGE，因此按实测给到单条 2 GiB / 总量 4 GiB；
+ * 这仍是「几 KB 解出几十 GB」这类攻击的硬闸，不是按声明值放行任意大小。
  */
 export const MAX_EXTRACT_ENTRIES = 2_000
-export const MAX_EXTRACT_BYTES = 1_024 * 1_024 * 1024
-/** 单个条目上限：官方最大条目就是主程序本身。 */
-export const MAX_EXTRACT_ENTRY_BYTES = 512 * 1_024 * 1_024
+export const MAX_EXTRACT_BYTES = 4 * 1_024 * 1_024 * 1_024
+/** 单个条目上限：官方最大条目是主程序 agy_acp_server.par（实测约 887.7 MiB）。 */
+export const MAX_EXTRACT_ENTRY_BYTES = 2 * 1_024 * 1_024 * 1_024
 /** 覆盖可执行文件安装根目录的环境变量名。 */
 export const INSTALL_ROOT_ENV = 'AGY_ACP_HOME'
 

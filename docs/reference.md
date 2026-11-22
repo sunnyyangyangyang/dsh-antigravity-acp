@@ -171,7 +171,11 @@ HTTP 额度回退只读 CLI 登录材料，换发 access token 仅留内存，�
 
 ## 运行目录与下载安全
 
-默认官方 server **1.4.0**，不随 registry 自动升级。自动下载限定 HTTPS / `dl.google.com`，拒绝任何重定向，按流写入临时文件；解压检查绝对路径、`..`、盘符、反斜杠与逃逸路径。成功后提交缓存，失败清理本次暂存。官方未提供校验和，不能据此宣称签名 / 校验和验证通过。
+默认官方 server **1.4.0**，不随 registry 自动升级。自动下载限定 HTTPS / `dl.google.com`，拒绝任何重定向，按流写入临时文件；解压检查绝对路径、`..`、盘符、反斜杠与逃逸路径。成功后提交缓存，失败清理本次暂存。官方 registry 从 1.5.x 起为每个平台给出 `sha256`，但本插件默认 1.4.0 且尚未接入校验实现，仍不能宣称签名 / 校验和验证通过。
+
+解压上限（压缩炸弹纵深防御）：条目数 2000、单条目 2 GiB、解压总量 4 GiB（0.1.47 起；旧值 512 MiB / 1 GiB 会把官方包本身拦下——2026-11-22 实测官方 1.4.0 Linux x86_64 包解压后 1,062,001,977 B，其中 `agy_acp_server.par` 单条 930,814,465 B）。
+
+Linux 上的 ACP 进程默认经 bwrap 沙箱启动（配置与白名单见 [沙箱](configuration.md#沙箱linux--bwrap)）：home 只暴露 `~/.gemini` 与安装根，`/usr`、`/etc` 只读，`/tmp` 私有，PID/IPC/UTS 隔离；网络保留。缺 bwrap 时拒绝启动并报 `AGY_SANDBOX_UNAVAILABLE`。
 
 二进制默认**不放在 DSH home**：
 
@@ -235,7 +239,8 @@ onefile 临时展开使用用户级根目录内独立的 `runtime/instance-*`，
 | `AGY_IMAGE_UNAVAILABLE` / `AGY_INVALID_IMAGE` | 附件服务 / image capability 不在场，或附件引用不一致 | 重新连接检查能力与附件；不要将文字描述误当已发送图片像素。 |
 | `AGY_BRIDGE_INVALID_ARGUMENTS` | 参数别名修正后仍缺必填键 | 按错误中签名补齐；模糊别名不由桥猜测。 |
 | `AGY_EMPTY_RESPONSE` | 上游结束时没有可见文本或工具调用 | 查看结束原因与连接诊断；不把仅思考、进度或空白当成功。 |
-| `AGY_ARCHIVE_TOO_LARGE` | 下载的 zip 条目数或解压后大小超过上限 | 官方包远低于上限；出现此码说明下载源异常，先核对 `AGY_ACP_URL` 未被改指他处，再重新下载，不要放宽上限。 |
+| `AGY_ARCHIVE_TOO_LARGE` | 下载的 zip 条目数或解压后大小超过上限（2000 条 / 单条 2 GiB / 总量 4 GiB） | 0.1.47 之前的旧上限（512 MiB / 1 GiB）会误拦官方包，先升级；仍报此码再核对 `AGY_ACP_URL` 未被改指他处并重下，不要放宽上限。 |
+| `AGY_SANDBOX_UNAVAILABLE` | Linux 默认开启沙箱但找不到 bwrap | 安装 bubblewrap，或配置 `bwrapPath` / `AGY_ACP_BWRAP`；排障时可临时设 `sandbox: false`，但那样官方进程拥有完整用户权限。 |
 | 额度 / Credits 不完整 | CLI 未登录、旧版本缺字段、HTTP 产品授权不足或网络失败 | 分别查看额度与 Credits 状态，检查 `agyCliPath`；ACP 登录不等于 CLI 登录。 |
 | 药丸完全消失 | 未选择本 provider，或 Client / remote 未装载 | 先确认选中 `antigravity-acp`、Host 与 Client 同版本；开发时核对 `$mount` 与依赖，避免让贡献型 remote 等待自身。 |
 | 运行目录积累 | 被强杀后残留或所有权 / 退出状态未知 | 未知目录不会按时间自动删除；停止相关进程后人工核对，不在进程仍活跃时批量清理。 |

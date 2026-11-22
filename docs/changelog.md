@@ -4,6 +4,13 @@
 
 记录源码与发布内容，不将本地构建、npm 发布和本机升级混为同一状态。日期采用 Asia/Hong_Kong。更早历史见 [Git 提交记录](https://github.com/KouzakiUmi/dsh-antigravity-acp/commits/main/)。
 
+## 0.1.47 · 2026-11-22
+
+- **修复官方包被压缩炸弹上限误拦**：0.1.31 起上限按「官方包解压后 200–300MB」估算（单条 512 MiB / 总量 1 GiB），但官方 1.4.0 Linux 包实测解压后 1,062,001,977 B，其中 `agy_acp_server.par` 单条 930,814,465 B（887.7 MiB），导致 Linux 用户在下载阶段必然报 `AGY_ARCHIVE_TOO_LARGE`。上限改为单条 2 GiB / 总量 4 GiB，并补一条按官方实测尺寸断言的回归用例。
+- **ACP 模式新增严格 bwrap 沙箱（Linux 默认开启）**：只读挂载 `/usr`、`/etc`、发行版系统符号链接与 systemd-resolved stub；home 父目录用空 tmpfs 顶掉后只 bind 回 `~/.gemini` 与安装根，并把遮蔽层 remount 成只读；`/tmp` 为私有 tmpfs；`--unshare-pid/ipc/uts`、`--cap-drop ALL`、`--die-with-parent`；不 unshare 网络（生成与 OAuth 要出网）。缺 bwrap 时拒绝启动（`AGY_SANDBOX_UNAVAILABLE`）而不是静默裸跑。
+- **新增配置**：`sandbox`（默认 `true`，非 Linux 忽略）、`bwrapPath`；环境变量 `AGY_ACP_BWRAP`、`AGY_ACP_NO_SANDBOX`（紧急关闭，仅供排障）。
+- **验证**：`npm run typecheck`、877 项测试、`npm run build` 通过。本机实测（bwrap 0.13.1）：沙箱内 `~/.dsh/AGENTS.md` 不可读、`~/Documents` 不可见、往家目录写文件 EROFS、`~/.gemini` 与安装根可写、`https://dl.google.com` 可连（302）。
+
 ## 0.1.46 · 2026-11-20
 
 - **客户端 i18n**：设置卡片、额度药丸与 Host 回传的固定状态文本支持简体中文 / English。语言取自 `navigator.language`（缺失时看 `<html lang>`），非中文环境显示英文，判定不到时保持中文；字典缺项回落中文，Host 动态拼接的文本原样显示。字典与内核拆在 `src/client-i18n/`，构建时内联为单个 `dist/client.js`。宿主配置编辑器中的字段说明（`Config` schema）仍是中文。
